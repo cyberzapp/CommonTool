@@ -357,7 +357,33 @@ function sampleColorsFromCanvas(
   }
 }
 
-export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
+function sanitizeForStandardFont(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/[\u20B9]/g, 'Rs.') // Indian Rupee
+    .replace(/[\u2018\u2019]/g, "'") // Smart single quotes
+    .replace(/[\u201C\u201D]/g, '"') // Smart double quotes
+    .replace(/[\u2014\u2013]/g, '-') // Em/En dash
+    .replace(/[\u2022\u25CF]/g, '*') // Bullet
+    .replace(/[\u2026]/g, '...') // Ellipsis
+    .replace(/[\u2713\u2714]/g, '[x]') // Checkmarks
+    .replace(/[\u00A0]/g, ' ') // Non-breaking space
+    .replace(/[^\x00-\x7F\xA0-\xFF]/g, ' '); // Clean out any exotic unencodable characters
+}
+
+export interface PdfEditorProps {
+  embedded?: boolean;
+  initialPdfBytes?: Uint8Array | null;
+  initialFileName?: string;
+  onPdfSaved?: (bytes: Uint8Array, filename: string) => void;
+}
+
+export const PdfEditor: React.FC<PdfEditorProps> = ({
+  embedded = false,
+  initialPdfBytes = null,
+  initialFileName = '',
+  onPdfSaved,
+}) => {
   const [showInfo, setShowInfo] = useState(false);
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
   const [fileName, setFileName] = useState<string>('');
@@ -571,7 +597,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
       setStatusBanner(null);
       const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
       const total = doc.getPageCount();
-      setPdfBytes(bytes);
+      setPdfBytes(bytes.slice(0)); // Clone bytes into state to prevent detachment
       setFileName(name);
       setPageCount(total);
       setCurrentPage(1);
@@ -601,6 +627,13 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
     }
   };
 
+  // Sync initial PDF bytes from parent if provided (e.g. from PdfMultiTool)
+  useEffect(() => {
+    if (initialPdfBytes && initialPdfBytes.length > 0 && pdfBytes !== initialPdfBytes) {
+      loadPdfBuffer(initialPdfBytes, initialFileName || 'Document.pdf');
+    }
+  }, [initialPdfBytes, initialFileName]);
+
   const handleFileUpload = async (file: File | undefined) => {
     if (!file) return;
     const buf = await file.arrayBuffer();
@@ -619,6 +652,9 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
 
       const baseViewport = page.getViewport({ scale: 1.0 });
       setPageDims({ width: baseViewport.width, height: baseViewport.height });
+      if (pdf.numPages && pdf.numPages !== pageCount) {
+        setPageCount(pdf.numPages);
+      }
 
       // Render high-DPI canvas at 2x scale
       const renderScale = 2.0;
@@ -1340,14 +1376,36 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           const font = pickEmbeddedFont(item.fontFamily, item.bold, item.italic);
           const fg = hexToRgb01(item.textColor);
           const targetBaselinePdfY = pageH - item.baselineY;
+          const cleanText = sanitizeForStandardFont(item.text);
+          const lines = cleanText.split('\n');
+          let curLineY = targetBaselinePdfY;
 
-          pdfPage.drawText(item.text, {
-            x: item.x,
-            y: targetBaselinePdfY,
-            size: item.fontSize,
-            font,
-            color: rgb(fg.r, fg.g, fg.b),
-          });
+          for (const line of lines) {
+            if (line.trim().length > 0) {
+              try {
+                pdfPage.drawText(line, {
+                  x: item.x,
+                  y: curLineY,
+                  size: item.fontSize,
+                  font,
+                  color: rgb(fg.r, fg.g, fg.b),
+                });
+              } catch {
+                try {
+                  pdfPage.drawText(line.replace(/[^\x20-\x7E]/g, ' '), {
+                    x: item.x,
+                    y: curLineY,
+                    size: item.fontSize,
+                    font,
+                    color: rgb(fg.r, fg.g, fg.b),
+                  });
+                } catch {
+                  // Ignore per-item draw error
+                }
+              }
+            }
+            curLineY -= item.fontSize * 1.18;
+          }
         }
       }
 
@@ -1394,35 +1452,57 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
         for (const wp of wmTargetPages) {
           if (!wp) continue;
           const { width: pW, height: pH } = wp.getSize();
+          const cleanWmText = sanitizeForStandardFont(watermarkSettings.text);
           const textW = wmFont.widthOfTextAtSize(
-            watermarkSettings.text,
+            cleanWmText,
             watermarkSettings.fontSize
           );
           const rad = (watermarkSettings.rotation * Math.PI) / 180;
-          wp.drawText(watermarkSettings.text, {
-            x: pW / 2 - (textW / 2) * Math.cos(rad),
-            y: pH / 2 - (textW / 2) * Math.sin(rad),
-            size: watermarkSettings.fontSize,
-            font: wmFont,
-            color: rgb(wmc.r, wmc.g, wmc.b),
-            opacity: watermarkSettings.opacity,
-            rotate: degrees(watermarkSettings.rotation),
-          });
+          try {
+            wp.drawText(cleanWmText, {
+              x: pW / 2 - (textW / 2) * Math.cos(rad),
+              y: pH / 2 - (textW / 2) * Math.sin(rad),
+              size: watermarkSettings.fontSize,
+              font: wmFont,
+              color: rgb(wmc.r, wmc.g, wmc.b),
+              opacity: watermarkSettings.opacity,
+              rotate: degrees(watermarkSettings.rotation),
+            });
+          } catch {
+            // Ignore watermark draw error
+          }
         }
       }
 
-      const outBytes = await pdfDoc.save();
-      const blob = new Blob([new Uint8Array(outBytes)], { type: 'application/pdf' });
+      // Save PDF with universal backward compatibility (uncompressed XRef tables)
+      const outBytes = await pdfDoc.save({ useObjectStreams: false });
+      const totalPages = pdfDoc.getPageCount();
+
+      // Trigger safe async download
+      const blob = new Blob([outBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
       a.download = `Edited-${fileName || 'Document.pdf'}`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+
+      // Delay revocation by 60 seconds so browser download manager finishes streaming without corruption
+      setTimeout(() => {
+        if (document.body.contains(a)) {
+          document.body.removeChild(a);
+        }
+        URL.revokeObjectURL(url);
+      }, 60000);
+
+      if (onPdfSaved) {
+        onPdfSaved(outBytes, fileName || 'Document.pdf');
+      }
 
       setStatusBanner({
         type: 'success',
-        message: `Successfully exported vector-edited PDF (${fileName || 'Document.pdf'})!`,
+        message: `Successfully exported ${totalPages}-page edited PDF (${fileName || 'Document.pdf'})!`,
       });
     } catch (err: unknown) {
       setStatusBanner({
@@ -1756,16 +1836,28 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                   </button>
                 </div>
 
-                {embedded && (
-                  <button
-                    onClick={exportEditedPdf}
-                    disabled={isExporting}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-md"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                    <span>Download PDF</span>
-                  </button>
-                )}
+                <label
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                  title="Upload a different PDF file to edit"
+                >
+                  <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="hidden md:inline">Change PDF</span>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e.target.files?.[0])}
+                  />
+                </label>
+
+                <button
+                  onClick={exportEditedPdf}
+                  disabled={isExporting}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-md"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isExporting ? 'Exporting...' : `Download PDF${modifiedCount > 0 ? ` (${modifiedCount})` : ''}`}</span>
+                </button>
               </div>
             </div>
 

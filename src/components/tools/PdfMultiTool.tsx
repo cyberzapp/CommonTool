@@ -171,12 +171,17 @@ export const PdfMultiTool: React.FC = () => {
   const downloadBlob = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
+      URL.revokeObjectURL(url);
+    }, 60000);
   };
 
   const handleUploadPdfs = async (files: FileList | null, target: 'merge' | 'single') => {
@@ -864,7 +869,21 @@ export const PdfMultiTool: React.FC = () => {
       </div>
 
       {activeTab === 'edit' ? (
-        <PdfEditor embedded />
+        <PdfEditor
+          embedded
+          initialPdfBytes={singlePdf?.bytes}
+          initialFileName={singlePdf?.name}
+          onPdfSaved={(bytes, name) => {
+            setSinglePdf({
+              id: crypto.randomUUID(),
+              file: new File([bytes], name, { type: 'application/pdf' }),
+              name,
+              size: bytes.byteLength,
+              pageCount: singlePdf?.pageCount || 1,
+              bytes,
+            });
+          }}
+        />
       ) : (
       /* Main Split Workspace: Left = Controls, Right = Live Visual Page Preview */
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">

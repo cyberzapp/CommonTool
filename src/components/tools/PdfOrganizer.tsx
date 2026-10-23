@@ -244,10 +244,17 @@ export const PdfOrganizer: React.FC = () => {
     const blob = new Blob([bytesToSave], { type: 'application/pdf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    a.style.display = 'none';
     a.href = url;
     a.download = `${(pdfName || 'document').replace(/\.pdf$/i, '')}-${suffixToSave}.pdf`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      if (document.body.contains(a)) {
+        document.body.removeChild(a);
+      }
+      URL.revokeObjectURL(url);
+    }, 60000);
   };
 
   const liveNumberLabel =
