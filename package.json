@@ -1,0 +1,56 @@
+{
+  "name": "commontool",
+  "description": "CommonTool — Privacy-First, Zero-Upload Client-Side Web Utility Suite (18+ Tools for PDF, Media, OCR, Invoicing, Finance, Academic & Developer Workflows)",
+  "version": "1.0.0",
+  "private": false,
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cyberzapp/CommonTool.git"
+  },
+  "homepage": "https://commontool.web.app",
+  "bugs": {
+    "url": "https://github.com/cyberzapp/CommonTool/issues",
+    "email": "support@breathy.in"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build && node scripts/generate-seo-pages.mjs",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "deploy": "npm run build && npx -y firebase-tools@latest deploy --only hosting:commontool,firestore:rules,auth --project memory-2b328",
+    "deploy:hosting": "npm run build && npx -y firebase-tools@latest deploy --only hosting:commontool --project memory-2b328",
+    "deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project memory-2b328",
+    "deploy:auth": "npx -y firebase-tools@latest deploy --only auth --project memory-2b328"
+  },
+  "dependencies": {
+    "diff": "^7.0.0",
+    "firebase": "^11.3.1",
+    "heic2any": "^0.0.4",
+    "jspdf": "^2.5.2",
+    "jszip": "^3.10.1",
+    "lucide-react": "^0.475.0",
+    "marked": "^15.0.7",
+    "mathjs": "^14.0.1",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^4.10.38",
+    "qrcode": "^1.5.4",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tesseract.js": "^5.1.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.6",
+    "@types/diff": "^7.0.0",
+    "@types/node": "^22.13.4",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^19.0.8",
+    "@types/react-dom": "^19.0.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.0.6",
+    "typescript": "~5.7.2",
+    "vite": "^6.1.0"
+  }
+}

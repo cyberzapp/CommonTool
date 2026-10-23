@@ -1,0 +1,50 @@
+{
+  "name": "CommonTool — Privacy-First Utility Suite",
+  "short_name": "CommonTool",
+  "description": "14 zero-upload client-side utilities: PDF Multi-Tool, Media Converter, OCR, Invoicing, Legal Templates, Financial Calculators, QR & Branding, Citations, Math Grapher, and Productivity.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#fafafa",
+  "theme_color": "#09090b",
+  "categories": ["productivity", "utilities", "business", "education"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "PDF Multi-Tool",
+      "short_name": "PDF Tool",
+      "description": "Merge, split, compress, convert & sign PDFs",
+      "url": "/tools/pdf-multitool",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "OCR Scanner",
+      "short_name": "OCR",
+      "description": "Extract text from photos and receipts",
+      "url": "/tools/ocr-scanner",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Invoice Generator",
+      "short_name": "Invoices",
+      "description": "Create unbranded PDF invoices & receipts",
+      "url": "/tools/invoice-generator",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Quick Scratchpad",
+      "short_name": "Scratchpad",
+      "description": "Auto-saving local notes & checklist",
+      "url": "/tools/scratchpad-checklist",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

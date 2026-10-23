@@ -1,0 +1,423 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// This security rules file assumes the following data structures:
+//
+// Collection: users
+// Document ID: {userId} (matches Firebase Auth UID)
+// Fields:
+//   - uid: string (optional, immutable, must match userId / request.auth.uid)
+//   - displayName: string (optional, 0-120 chars) - user display name
+//   - email: string or null (optional, 0-254 chars) - user email address (PII, owner-only)
+//   - isAnonymous: bool (optional) - whether user signed in anonymously
+//   - photoURL: string (optional, 0-2048 chars) - user avatar URL
+//   - theme: string (optional, 1-50 chars) - UI theme preference
+//   - activeTool / activeTab: string (optional, 1-100 chars) - last active tool
+//   - preferences / settings: map (optional, max 50 keys) - user workspace preferences
+//   - createdAt: timestamp or string (optional, immutable on update)
+//   - updatedAt / lastLoginAt / lastSyncedAt: timestamp, string, or number (optional)
+//
+// Subcollection: users/{userId}/workspace
+// Document ID: {docId} (e.g., 'scratchpad', 'checklists', 'invoices', 'templates', 'citations', 'palettes', 'state')
+// Fields:
+//   - uid / userId: string (optional, immutable, must match userId)
+//   - userEmail: string (optional, 0-254 chars)
+//   - id / docId / type: string (optional, 1-100 chars)
+//   - title / name: string (optional, 0-500 chars)
+//   - content / text / markdown: string (optional, 0-200000 chars)
+//   - scratchpadNotes / checklistItems / savedInvoices / customTemplates / savedCitations / savedPalettes / pomodoroSettings: string, list, or map (optional, bounded size)
+//   - data / state / payload / value: map, list, or string (optional, bounded size)
+//   - items / entries / checklists / invoices / templates / citations / palettes: list or map (optional, bounded size)
+//   - updatedAt / lastSyncedAt / createdAt: timestamp, string, or number (optional)
+//
+// Subcollection: users/{userId}/items
+// Document ID: {itemId}
+// Fields:
+//   - uid / userId: string (optional, immutable, must match userId)
+//   - id: string (optional, 1-150 chars)
+//   - type / category / tool: string (optional, 1-100 chars) - item category (invoice, template, note, checklist, citation, palette, etc.)
+//   - title / name / label: string (optional, 0-500 chars)
+//   - content / text / body / description: string (optional, 0-200000 chars)
+//   - data / payload / meta / metadata: map (optional, max 100 keys)
+//   - items / tags / lines / entries: list (optional, max 500 elements)
+//   - pinned / archived / starred / completed: bool (optional)
+//   - amount / total / tax / rate: number (optional)
+//   - createdAt: timestamp, string, or number (optional, immutable on update)
+//   - updatedAt: timestamp, string, or number (optional)
+//
+// Collection: support_tickets
+// Document ID: {ticketId}
+// Access: Create-only for visitors/users; read/update/delete denied to clients (Admin SDK / Console only)
+// Fields:
+//   - name: string (required, 1-120 chars)
+//   - email: string (required, 3-180 chars)
+//   - topic: string (required, 1-150 chars)
+//   - message: string (required, 1-5000 chars)
+//   - createdAt: timestamp, string, or number (required)
+//   - uid / userId / status / source / userAgent: optional metadata fields
+//
+// Collection: donations
+// Document ID: {donationId}
+// Access: Create-only after Razorpay checkout; read/update/delete denied to clients (Admin SDK / Console only)
+// Fields:
+//   - paymentId: string (required, 4-120 chars)
+//   - amount: number (required, > 0)
+//   - currency: string (required, in ['INR', 'USD'])
+//   - donorName: string (required, 1-150 chars)
+//   - createdAt: timestamp, string, or number (required)
+//   - id / orderId / signature / verified / donorEmail / message / tierLabel / uid: optional Razorpay receipt fields
+//
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Check if user owns the resource (for user-owned documents)
+    function isOwner(userId) {
+      return isAuthenticated() &&
+        userId is string &&
+        userId.size() >= 1 &&
+        userId.size() <= 128 &&
+        request.auth.uid == userId;
+    }
+
+    // Check if user is owner based on document's uid field
+    function isDocOwner() {
+      return isAuthenticated() &&
+        (!('uid' in resource.data) || resource.data.uid == request.auth.uid) &&
+        (!('userId' in resource.data) || resource.data.userId == request.auth.uid);
+    }
+
+    // Verify UID hasn't been tampered with on create
+    function uidUnchanged(userId) {
+      return (!('uid' in request.resource.data) || request.resource.data.uid == userId) &&
+        (!('userId' in request.resource.data) || request.resource.data.userId == userId) &&
+        (!('ownerId' in request.resource.data) || request.resource.data.ownerId == userId);
+    }
+
+    // Ensure uid and ownership fields are not modified on update
+    function uidNotModified(userId) {
+      return (!('uid' in request.resource.data) ||
+          (!('uid' in resource.data) ? request.resource.data.uid == userId : request.resource.data.uid == resource.data.uid)) &&
+        (!('userId' in request.resource.data) ||
+          (!('userId' in resource.data) ? request.resource.data.userId == userId : request.resource.data.userId == resource.data.userId)) &&
+        (!('ownerId' in request.resource.data) ||
+          (!('ownerId' in resource.data) ? request.resource.data.ownerId == userId : request.resource.data.ownerId == resource.data.ownerId));
+    }
+
+    // Ensure createdAt is not modified if it already exists on the document
+    function createdAtUnchanged() {
+      return !('createdAt' in resource.data) ||
+        !('createdAt' in request.resource.data) ||
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // Prevent privilege escalation via self-assigned role/admin fields
+    function noPrivilegeEscalation(data) {
+      return !('role' in data) &&
+        !('roles' in data) &&
+        !('isAdmin' in data) &&
+        !('admin' in data) &&
+        !('permissions' in data);
+    }
+
+    // Validate required fields exist
+    function hasRequiredFields(data, fields) {
+      return data is map && data.keys().hasAll(fields);
+    }
+
+    // Validate optional string field with min and max length
+    function isValidOptionalString(data, field, minLen, maxLen) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is string &&
+         data[field].size() >= minLen &&
+         data[field].size() <= maxLen);
+    }
+
+    // Validate optional boolean field
+    function isValidOptionalBool(data, field) {
+      return !(field in data) ||
+        data[field] == null ||
+        data[field] is bool;
+    }
+
+    // Validate optional number field within reasonable bounds
+    function isValidOptionalNumber(data, field, minVal, maxVal) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is number &&
+         data[field] >= minVal &&
+         data[field] <= maxVal);
+    }
+
+    // Validate optional timestamp / date string / epoch ms field
+    function isValidOptionalDateOrTime(data, field) {
+      return !(field in data) ||
+        data[field] == null ||
+        data[field] is timestamp ||
+        (data[field] is number && data[field] >= 0 && data[field] <= 9999999999999) ||
+        (data[field] is string && data[field].size() >= 1 && data[field].size() <= 64);
+    }
+
+    // Validate optional list or map container with size limit
+    function isValidOptionalContainer(data, field, maxEntries) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is list && data[field].size() <= maxEntries) ||
+        (data[field] is map && data[field].keys().size() <= maxEntries);
+    }
+
+    // Validate optional string or container (for flexible workspace state fields)
+    function isValidOptionalTextOrContainer(data, field, maxStrLen, maxEntries) {
+      return !(field in data) ||
+        data[field] == null ||
+        (data[field] is string && data[field].size() <= maxStrLen) ||
+        (data[field] is list && data[field].size() <= maxEntries) ||
+        (data[field] is map && data[field].keys().size() <= maxEntries);
+    }
+
+    // ===============================================================
+    // Domain Validators (Called in BOTH create and update rules)
+    // ===============================================================
+
+    // Validate users/{userId} document
+    function isValidUser(data, userId) {
+      return data is map &&
+        data.keys().size() >= 1 &&
+        data.keys().size() <= 30 &&
+        noPrivilegeEscalation(data) &&
+        uidUnchanged(userId) &&
+        isValidOptionalString(data, 'uid', 1, 128) &&
+        isValidOptionalString(data, 'userId', 1, 128) &&
+        isValidOptionalString(data, 'displayName', 0, 120) &&
+        isValidOptionalString(data, 'name', 0, 120) &&
+        isValidOptionalString(data, 'email', 0, 254) &&
+        isValidOptionalBool(data, 'isAnonymous') &&
+        isValidOptionalString(data, 'photoURL', 0, 2048) &&
+        isValidOptionalString(data, 'theme', 1, 50) &&
+        isValidOptionalString(data, 'activeTool', 1, 100) &&
+        isValidOptionalString(data, 'activeTab', 1, 100) &&
+        isValidOptionalContainer(data, 'preferences', 50) &&
+        isValidOptionalContainer(data, 'settings', 50) &&
+        isValidOptionalContainer(data, 'metadata', 50) &&
+        isValidOptionalContainer(data, 'workspaceMeta', 50) &&
+        isValidOptionalDateOrTime(data, 'createdAt') &&
+        isValidOptionalDateOrTime(data, 'updatedAt') &&
+        isValidOptionalDateOrTime(data, 'lastLoginAt') &&
+        isValidOptionalDateOrTime(data, 'lastSyncedAt');
+    }
+
+    // Validate users/{userId}/workspace/{docId} document
+    function isValidWorkspaceDoc(data, userId, docId) {
+      return data is map &&
+        docId is string &&
+        docId.size() >= 1 &&
+        docId.size() <= 100 &&
+        data.keys().size() >= 1 &&
+        data.keys().size() <= 40 &&
+        noPrivilegeEscalation(data) &&
+        uidUnchanged(userId) &&
+        isValidOptionalString(data, 'uid', 1, 128) &&
+        isValidOptionalString(data, 'userId', 1, 128) &&
+        isValidOptionalString(data, 'userEmail', 0, 254) &&
+        isValidOptionalString(data, 'id', 1, 100) &&
+        isValidOptionalString(data, 'docId', 1, 100) &&
+        isValidOptionalString(data, 'type', 1, 100) &&
+        isValidOptionalString(data, 'title', 0, 500) &&
+        isValidOptionalString(data, 'name', 0, 500) &&
+        isValidOptionalString(data, 'content', 0, 200000) &&
+        isValidOptionalString(data, 'text', 0, 200000) &&
+        isValidOptionalString(data, 'markdown', 0, 200000) &&
+        isValidOptionalString(data, 'notes', 0, 200000) &&
+        isValidOptionalTextOrContainer(data, 'scratchpad', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'scratchpadNotes', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'checklistItems', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'savedInvoices', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'customTemplates', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'savedCitations', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'savedPalettes', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'pomodoroSettings', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'data', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'state', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'payload', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'value', 200000, 500) &&
+        isValidOptionalContainer(data, 'items', 500) &&
+        isValidOptionalContainer(data, 'entries', 500) &&
+        isValidOptionalContainer(data, 'checklists', 500) &&
+        isValidOptionalContainer(data, 'invoices', 500) &&
+        isValidOptionalContainer(data, 'templates', 500) &&
+        isValidOptionalContainer(data, 'citations', 500) &&
+        isValidOptionalContainer(data, 'palettes', 500) &&
+        isValidOptionalContainer(data, 'snippets', 500) &&
+        isValidOptionalContainer(data, 'history', 500) &&
+        isValidOptionalContainer(data, 'settings', 100) &&
+        isValidOptionalDateOrTime(data, 'createdAt') &&
+        isValidOptionalDateOrTime(data, 'updatedAt') &&
+        isValidOptionalDateOrTime(data, 'lastSyncedAt');
+    }
+
+    // Validate users/{userId}/items/{itemId} document
+    function isValidItem(data, userId, itemId) {
+      return data is map &&
+        itemId is string &&
+        itemId.size() >= 1 &&
+        itemId.size() <= 150 &&
+        data.keys().size() >= 1 &&
+        data.keys().size() <= 40 &&
+        noPrivilegeEscalation(data) &&
+        uidUnchanged(userId) &&
+        isValidOptionalString(data, 'uid', 1, 128) &&
+        isValidOptionalString(data, 'userId', 1, 128) &&
+        isValidOptionalString(data, 'id', 1, 150) &&
+        isValidOptionalString(data, 'type', 1, 100) &&
+        isValidOptionalString(data, 'category', 1, 100) &&
+        isValidOptionalString(data, 'tool', 1, 100) &&
+        isValidOptionalString(data, 'status', 1, 50) &&
+        isValidOptionalString(data, 'title', 0, 500) &&
+        isValidOptionalString(data, 'name', 0, 500) &&
+        isValidOptionalString(data, 'label', 0, 500) &&
+        isValidOptionalString(data, 'description', 0, 5000) &&
+        isValidOptionalString(data, 'content', 0, 200000) &&
+        isValidOptionalString(data, 'text', 0, 200000) &&
+        isValidOptionalString(data, 'body', 0, 200000) &&
+        isValidOptionalString(data, 'currency', 1, 16) &&
+        isValidOptionalString(data, 'clientName', 0, 300) &&
+        isValidOptionalString(data, 'invoiceNumber', 0, 100) &&
+        isValidOptionalTextOrContainer(data, 'data', 200000, 500) &&
+        isValidOptionalTextOrContainer(data, 'payload', 200000, 500) &&
+        isValidOptionalContainer(data, 'meta', 100) &&
+        isValidOptionalContainer(data, 'metadata', 100) &&
+        isValidOptionalContainer(data, 'items', 500) &&
+        isValidOptionalContainer(data, 'lines', 500) &&
+        isValidOptionalContainer(data, 'entries', 500) &&
+        isValidOptionalContainer(data, 'colors', 100) &&
+        isValidOptionalContainer(data, 'tags', 50) &&
+        isValidOptionalBool(data, 'pinned') &&
+        isValidOptionalBool(data, 'archived') &&
+        isValidOptionalBool(data, 'starred') &&
+        isValidOptionalBool(data, 'completed') &&
+        isValidOptionalNumber(data, 'amount', -1000000000, 1000000000) &&
+        isValidOptionalNumber(data, 'total', -1000000000, 1000000000) &&
+        isValidOptionalNumber(data, 'subtotal', -1000000000, 1000000000) &&
+        isValidOptionalNumber(data, 'tax', -1000000000, 1000000000) &&
+        isValidOptionalNumber(data, 'rate', -1000000000, 1000000000) &&
+        isValidOptionalDateOrTime(data, 'createdAt') &&
+        isValidOptionalDateOrTime(data, 'updatedAt') &&
+        isValidOptionalDateOrTime(data, 'dueDate');
+    }
+
+    // Validate support_tickets/{ticketId} document
+    function isValidSupportTicket(data) {
+      return hasRequiredFields(data, ['name', 'email', 'topic', 'message', 'createdAt']) &&
+        data.keys().size() <= 15 &&
+        noPrivilegeEscalation(data) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 120 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 180 &&
+        data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 150 &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 5000 &&
+        isValidOptionalDateOrTime(data, 'createdAt') &&
+        isValidOptionalString(data, 'uid', 0, 128) &&
+        isValidOptionalString(data, 'userId', 0, 128) &&
+        isValidOptionalString(data, 'status', 1, 50) &&
+        isValidOptionalString(data, 'source', 1, 100) &&
+        isValidOptionalString(data, 'userAgent', 0, 500);
+    }
+
+    // Validate donations/{donationId} document
+    function isValidDonation(data) {
+      return hasRequiredFields(data, ['paymentId', 'amount', 'currency', 'donorName', 'createdAt']) &&
+        data.keys().size() <= 20 &&
+        noPrivilegeEscalation(data) &&
+        data.paymentId is string && data.paymentId.size() >= 4 && data.paymentId.size() <= 120 &&
+        data.amount is number && data.amount > 0 && data.amount <= 100000000 &&
+        data.currency in ['INR', 'USD'] &&
+        data.donorName is string && data.donorName.size() >= 1 && data.donorName.size() <= 150 &&
+        isValidOptionalDateOrTime(data, 'createdAt') &&
+        isValidOptionalString(data, 'id', 1, 120) &&
+        isValidOptionalString(data, 'orderId', 0, 150) &&
+        isValidOptionalString(data, 'signature', 0, 256) &&
+        isValidOptionalBool(data, 'verified') &&
+        isValidOptionalString(data, 'donorEmail', 0, 180) &&
+        isValidOptionalString(data, 'message', 0, 2000) &&
+        isValidOptionalString(data, 'tierLabel', 0, 120) &&
+        isValidOptionalString(data, 'uid', 0, 128) &&
+        isValidOptionalString(data, 'userId', 0, 128) &&
+        isValidOptionalString(data, 'status', 1, 50);
+    }
+
+    // ===============================================================
+    // Collection Security Rules
+    // ===============================================================
+
+    // 1. User profile & workspace metadata document: users/{userId}
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) &&
+        isValidUser(request.resource.data, userId);
+      allow update: if isOwner(userId) &&
+        isDocOwner() &&
+        uidNotModified(userId) &&
+        createdAtUnchanged() &&
+        isValidUser(request.resource.data, userId);
+      allow delete: if isOwner(userId) && isDocOwner();
+
+      // 2. Synced user workspace state subcollection: users/{userId}/workspace/{docId}
+      match /workspace/{docId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+          isValidWorkspaceDoc(request.resource.data, userId, docId);
+        allow update: if isOwner(userId) &&
+          isDocOwner() &&
+          uidNotModified(userId) &&
+          createdAtUnchanged() &&
+          isValidWorkspaceDoc(request.resource.data, userId, docId);
+        allow delete: if isOwner(userId) && isDocOwner();
+      }
+
+      // 3. Individual saved user items subcollection: users/{userId}/items/{itemId}
+      match /items/{itemId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId) &&
+          isValidItem(request.resource.data, userId, itemId);
+        allow update: if isOwner(userId) &&
+          isDocOwner() &&
+          uidNotModified(userId) &&
+          createdAtUnchanged() &&
+          isValidItem(request.resource.data, userId, itemId);
+        allow delete: if isOwner(userId) && isDocOwner();
+      }
+    }
+
+    // 4. Visitor / User Support Tickets: support_tickets/{ticketId}
+    // Create-only with strict schema & length bounds; read/update/delete denied to protect PII
+    match /support_tickets/{ticketId} {
+      allow create: if isValidSupportTicket(request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    // 5. Razorpay Donation Records: donations/{donationId}
+    // Create-only with strict schema & payment validation; read/update/delete denied to protect donor privacy
+    match /donations/{donationId} {
+      allow create: if isValidDonation(request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    // 6. Default Deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

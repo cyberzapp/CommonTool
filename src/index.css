@@ -1,0 +1,270 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light;
+  --accent-color: #4f46e5;
+  --bg-app: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-muted: #f1f5f9;
+  --border-subtle: #e2e8f0;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-track: #f8fafc;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+html.dark {
+  color-scheme: dark;
+  --accent-color: #6366f1;
+  --bg-app: #09090b;
+  --bg-surface: #121215;
+  --bg-muted: #18181b;
+  --border-subtle: #27272a;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
+  --scrollbar-thumb: #3f3f46;
+  --scrollbar-track: #09090b;
+}
+
+html.light {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  min-block-size: 100dvb;
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  accent-color: var(--accent-color);
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1, h2, h3, h4 {
+  text-wrap: balance;
+  letter-spacing: -0.02em;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+canvas, img, svg, video {
+  display: block;
+}
+
+.font-mono-code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.font-signature {
+  font-family: 'Dancing Script', cursive;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Prevent iOS Safari auto-zoom on input focus */
+@media (max-width: 640px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* Light-Mode Adaptive Overrides for Tool Workbenches */
+html.light .bg-slate-950,
+html.light .bg-slate-950\/80,
+html.light .bg-slate-950\/70,
+html.light .bg-slate-950\/60,
+html.light .bg-slate-950\/50 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-slate-900,
+html.light .bg-slate-900\/70,
+html.light .bg-slate-900\/60,
+html.light .bg-slate-900\/50 {
+  background-color: #ffffff !important;
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03);
+}
+
+html.light .bg-slate-800 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html.light .bg-slate-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .border-slate-800,
+html.light .border-slate-800\/90,
+html.light .border-slate-800\/80,
+html.light .border-slate-700 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Only remap text-white on container/text elements that DO NOT have a solid dark/brand background */
+html.light .text-white:not(.bg-zinc-900):not(.bg-zinc-800):not(.bg-slate-900):not(.bg-indigo-600):not(.bg-indigo-500):not(.bg-rose-600):not(.bg-rose-500):not(.bg-blue-600):not(.bg-blue-500):not(.bg-violet-500):not(.bg-purple-500):not(.bg-fuchsia-500):not(.bg-emerald-600):not(.bg-teal-600):not(.bg-gradient-to-r),
+html.light .text-slate-100,
+html.light .text-slate-200 {
+  color: #0f172a !important;
+}
+
+/* Ensure headings & labels with text-slate-900 or text-zinc-900 stay dark in light mode */
+html.light .text-slate-900,
+html.light .text-zinc-900 {
+  color: #0f172a !important;
+}
+
+/* Preserve white text inside solid dark/colored buttons & headers */
+html.light .bg-zinc-900,
+html.light .bg-zinc-900 *,
+html.light .bg-indigo-600,
+html.light .bg-indigo-600 *,
+html.light .bg-indigo-500,
+html.light .bg-indigo-500 *,
+html.light .bg-rose-600,
+html.light .bg-rose-600 *,
+html.light .bg-rose-500,
+html.light .bg-rose-500 *,
+html.light .bg-blue-600,
+html.light .bg-blue-600 *,
+html.light .bg-blue-500,
+html.light .bg-blue-500 *,
+html.light .bg-violet-500,
+html.light .bg-violet-500 *,
+html.light .bg-purple-500,
+html.light .bg-purple-500 *,
+html.light .bg-fuchsia-500,
+html.light .bg-fuchsia-500 *,
+html.light .bg-emerald-600,
+html.light .bg-emerald-600 *,
+html.light .bg-gradient-to-r,
+html.light .bg-gradient-to-r * {
+  color: #ffffff !important;
+}
+
+html.light .text-slate-300 {
+  color: #334155 !important;
+}
+
+html.light .text-slate-400,
+html.light .text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Soft badge & accent contrast in light mode */
+html.light .text-rose-300,
+html.light .text-rose-400 {
+  color: #e11d48 !important;
+}
+html.light .text-emerald-300,
+html.light .text-emerald-400 {
+  color: #059669 !important;
+}
+html.light .text-amber-300,
+html.light .text-amber-400 {
+  color: #d97706 !important;
+}
+html.light .text-indigo-300,
+html.light .text-indigo-400,
+html.light .text-blue-400 {
+  color: #4f46e5 !important;
+}
+html.light .text-teal-300,
+html.light .text-teal-400,
+html.light .text-cyan-300,
+html.light .text-cyan-400,
+html.light .text-sky-300,
+html.light .text-sky-400 {
+  color: #0284c7 !important;
+}
+html.light .text-violet-300,
+html.light .text-violet-400,
+html.light .text-purple-400,
+html.light .text-fuchsia-300,
+html.light .text-fuchsia-400 {
+  color: #7c3aed !important;
+}
+html.light .text-orange-300,
+html.light .text-orange-400 {
+  color: #ea580c !important;
+}
+html.light .text-lime-300,
+html.light .text-lime-400 {
+  color: #4d7c0f !important;
+}
+
+/* Minimal Dark Mode Refinement */
+html.dark .bg-slate-950,
+html.dark .bg-slate-950\/80,
+html.dark .bg-slate-950\/70,
+html.dark .bg-slate-950\/60,
+html.dark .bg-slate-950\/50 {
+  background-color: #09090b !important;
+}
+
+html.dark .bg-slate-900,
+html.dark .bg-slate-900\/70,
+html.dark .bg-slate-900\/60,
+html.dark .bg-slate-900\/50 {
+  background-color: #121215 !important;
+}
+
+html.dark .border-slate-800,
+html.dark .border-slate-800\/90,
+html.dark .border-slate-800\/80 {
+  border-color: #27272a !important;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="password"],
+input[type="date"],
+select,
+textarea {
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus,
+input[type="date"]:focus,
+select:focus,
+textarea:focus {
+  border-color: #6366f1 !important;
+}
+
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+}
