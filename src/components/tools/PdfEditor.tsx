@@ -16,6 +16,7 @@ import {
   ZoomIn,
   ZoomOut,
   Plus,
+  Minus,
   Eraser,
   Highlighter,
   Image as ImageIcon,
@@ -27,8 +28,13 @@ import {
   Sparkles,
   Stamp,
   Droplet,
-  Sliders,
+  Undo2,
+  Redo2,
+  Replace,
+  Search,
   Check,
+  X,
+  SlidersHorizontal,
 } from 'lucide-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
@@ -106,6 +112,11 @@ interface PageDimensions {
 }
 
 type EditorToolMode = 'edit-text' | 'add-text' | 'whiteout' | 'highlight' | 'signature';
+
+interface HistorySnapshot {
+  textItems: EditablePdfTextItem[];
+  shapes: PdfAnnotationShape[];
+}
 
 function rgbToHex(r: number, g: number, b: number): string {
   const toHex = (n: number) => Math.max(0, Math.min(255, Math.round(n))).toString(16).padStart(2, '0');
@@ -360,10 +371,39 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
   const [extractedPages, setExtractedPages] = useState<Record<number, boolean>>({});
   const [shapes, setShapes] = useState<PdfAnnotationShape[]>([]);
 
+  // History stack for Undo / Redo
+  const [history, setHistory] = useState<HistorySnapshot[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [selectedShapeId, setSelectedShapeId] = useState<string | null>(null);
-  const [draggingId, setDraggingId] = useState<{ kind: 'text' | 'shape'; id: string; offsetX: number; offsetY: number } | null>(null);
 
+  // Dragging & Resizing State
+  const [draggingId, setDraggingId] = useState<{
+    kind: 'text' | 'shape';
+    id: string;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+
+  const [resizingHandle, setResizingHandle] = useState<{
+    id: string;
+    handle: 'nw' | 'ne' | 'se' | 'sw' | 'e' | 'w';
+    startX: number;
+    startY: number;
+    startWidth: number;
+    startFontSize: number;
+    startXPos: number;
+  } | null>(null);
+
+  // Search & Replace ("Replace Text" Mode)
+  const [replaceModalOpen, setReplaceModalOpen] = useState(false);
+  const [findQuery, setFindQuery] = useState('');
+  const [replaceQuery, setReplaceQuery] = useState('');
+  const [replaceScope, setReplaceScope] = useState<'current' | 'all'>('current');
+  const [matchCase, setMatchCase] = useState(false);
+
+  // Signature & Stamps & Watermark
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
   const [typedSignature, setTypedSignature] = useState('Alex Morgan');
   const [isDrawingSig, setIsDrawingSig] = useState(false);
@@ -387,34 +427,111 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
   const [isExporting, setIsExporting] = useState(false);
   const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const handleAddStamp = (stampText: string, stampColor: string, subtext?: string) => {
-    const dataUrl = generateStampDataUrl(stampText, stampColor, subtext);
-    if (!dataUrl) return;
-    const newShape: PdfAnnotationShape = {
-      id: `shape-stamp-${Date.now()}`,
-      pageIndex: currentPage - 1,
-      kind: 'stamp',
-      x: Math.max(30, pageDims.width / 2 - 70),
-      y: Math.max(30, pageDims.height / 2 - 30),
-      width: 140,
-      height: 60,
-      color: stampColor,
-      opacity: 0.95,
-      imageDataUrl: dataUrl,
-    };
-    setShapes((prev) => [...prev, newShape]);
-    setSelectedShapeId(newShape.id);
-    setSelectedTextId(null);
-    setStampModalOpen(false);
-    setStatusBanner({ type: 'success', message: `Added "${stampText}" stamp to Page ${currentPage}` });
-  };
-
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
   const sigCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const activeInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedText = textItems.find((t) => t.id === selectedTextId) || null;
   const selectedShape = shapes.find((s) => s.id === selectedShapeId) || null;
+
+  // Record a state change in history for Undo / Redo
+  const pushHistory = useCallback(
+    (newTextItems: EditablePdfTextItem[], newShapes: PdfAnnotationShape[]) => {
+      setHistory((prev) => {
+        const next = prev.slice(0, historyIndex + 1);
+        next.push({
+          textItems: JSON.parse(JSON.stringify(newTextItems)),
+          shapes: JSON.parse(JSON.stringify(newShapes)),
+        });
+        if (next.length > 35) next.shift();
+        return next;
+      });
+      setHistoryIndex((prev) => Math.min(prev + 1, 34));
+    },
+    [historyIndex]
+  );
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const targetIndex = historyIndex - 1;
+      const snapshot = history[targetIndex];
+      if (snapshot) {
+        setTextItems(JSON.parse(JSON.stringify(snapshot.textItems)));
+        setShapes(JSON.parse(JSON.stringify(snapshot.shapes)));
+        setHistoryIndex(targetIndex);
+        setSelectedTextId(null);
+        setSelectedShapeId(null);
+      }
+    }
+  }, [history, historyIndex]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const targetIndex = historyIndex + 1;
+      const snapshot = history[targetIndex];
+      if (snapshot) {
+        setTextItems(JSON.parse(JSON.stringify(snapshot.textItems)));
+        setShapes(JSON.parse(JSON.stringify(snapshot.shapes)));
+        setHistoryIndex(targetIndex);
+        setSelectedTextId(null);
+        setSelectedShapeId(null);
+      }
+    }
+  }, [history, historyIndex]);
+
+  // Global Keyboard shortcuts: Ctrl+Z, Ctrl+Y, Ctrl+F, Escape, Delete
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't intercept if typing in an input unless it's Ctrl+Z / Ctrl+Y
+      const isInput =
+        e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          handleRedo();
+        } else {
+          handleUndo();
+        }
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
+        e.preventDefault();
+        setReplaceModalOpen(true);
+      } else if (e.key === 'Escape') {
+        setSelectedTextId(null);
+        setSelectedShapeId(null);
+        setReplaceModalOpen(false);
+      } else if ((e.key === 'Delete' || e.key === 'Backspace') && !isInput) {
+        if (selectedTextId) {
+          const item = textItems.find((t) => t.id === selectedTextId);
+          if (item) {
+            let next: EditablePdfTextItem[];
+            if (item.isNew) {
+              next = textItems.filter((t) => t.id !== item.id);
+            } else {
+              next = textItems.map((t) =>
+                t.id === item.id ? { ...t, isDeleted: true, text: '' } : t
+              );
+            }
+            setTextItems(next);
+            pushHistory(next, shapes);
+            setSelectedTextId(null);
+          }
+        } else if (selectedShapeId) {
+          const nextShapes = shapes.filter((s) => s.id !== selectedShapeId);
+          setShapes(nextShapes);
+          pushHistory(textItems, nextShapes);
+          setSelectedShapeId(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleUndo, handleRedo, selectedTextId, selectedShapeId, textItems, shapes, pushHistory]);
 
   const cssFontStack = (family: PdfFontFamily, exactFontName?: string) => {
     const prefix = exactFontName ? `"${exactFontName}", ` : '';
@@ -463,6 +580,8 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
       setExtractedPages({});
       setSelectedTextId(null);
       setSelectedShapeId(null);
+      setHistory([]);
+      setHistoryIndex(-1);
 
       // Fit zoom nicely on mobile vs desktop
       if (window.innerWidth < 640) {
@@ -601,7 +720,6 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
             prev.italic === run.italic
           ) {
             const gap = run.x - (prev.x + prev.width);
-            // Merge if part of the same word or separated by normal word space (not a separate table column)
             if (gap >= -3 && gap <= prev.fontSize * 0.9) {
               const needsSpace =
                 gap > prev.fontSize * 0.16 &&
@@ -656,10 +774,18 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           };
         });
 
-        setTextItems((prev) => [
-          ...prev.filter((item) => item.pageIndex !== pageIdx),
-          ...pageItems,
-        ]);
+        setTextItems((prev) => {
+          const next = [
+            ...prev.filter((item) => item.pageIndex !== pageIdx),
+            ...pageItems,
+          ];
+          // Record initial snapshot if empty
+          if (historyIndex === -1) {
+            setHistory([{ textItems: next, shapes: [] }]);
+            setHistoryIndex(0);
+          }
+          return next;
+        });
         setExtractedPages((prev) => ({ ...prev, [pageIdx]: true }));
       }
     } catch {
@@ -667,16 +793,20 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
     } finally {
       setIsRendering(false);
     }
-  }, [pdfBytes, currentPage, extractedPages]);
+  }, [pdfBytes, currentPage, extractedPages, historyIndex]);
 
   useEffect(() => {
     renderPageAndExtractText();
   }, [renderPageAndExtractText]);
 
-  // Update a specific text item's property
-  const updateTextItem = (id: string, patch: Partial<EditablePdfTextItem>) => {
-    setTextItems((prev) =>
-      prev.map((item) => {
+  // Update a specific text item's property and optionally commit to history
+  const updateTextItem = (
+    id: string,
+    patch: Partial<EditablePdfTextItem>,
+    recordHistory = false
+  ) => {
+    setTextItems((prev) => {
+      const next = prev.map((item) => {
         if (item.id !== id) return item;
         const updated = { ...item, ...patch };
         if (patch.fontSize !== undefined) {
@@ -687,8 +817,12 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           updated.baselineY = patch.topY + updated.fontSize * 0.84;
         }
         return updated;
-      })
-    );
+      });
+      if (recordHistory) {
+        pushHistory(next, shapes);
+      }
+      return next;
+    });
   };
 
   // Handle clicking on the page surface when in 'add-text', 'whiteout', or 'highlight' mode
@@ -731,7 +865,9 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
         isNew: true,
         isDeleted: false,
       };
-      setTextItems((prev) => [...prev, newItem]);
+      const nextItems = [...textItems, newItem];
+      setTextItems(nextItems);
+      pushHistory(nextItems, shapes);
       setSelectedTextId(newId);
       setSelectedShapeId(null);
       setToolMode('edit-text');
@@ -748,7 +884,9 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
         color: '#ffffff',
         opacity: 1,
       };
-      setShapes((prev) => [...prev, newShape]);
+      const nextShapes = [...shapes, newShape];
+      setShapes(nextShapes);
+      pushHistory(textItems, nextShapes);
       setSelectedShapeId(id);
       setSelectedTextId(null);
     } else if (toolMode === 'highlight') {
@@ -764,7 +902,9 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
         color: '#fde047',
         opacity: 0.42,
       };
-      setShapes((prev) => [...prev, newShape]);
+      const nextShapes = [...shapes, newShape];
+      setShapes(nextShapes);
+      pushHistory(textItems, nextShapes);
       setSelectedShapeId(id);
       setSelectedTextId(null);
     } else {
@@ -773,24 +913,111 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
     }
   };
 
-  // Drag support for moving text boxes or shapes
+  // Drag & Resize mouse move handlers
   const handleMouseMoveOnPage = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!draggingId || !pageContainerRef.current) return;
+    if (!pageContainerRef.current) return;
     const rect = pageContainerRef.current.getBoundingClientRect();
-    const nextX = Math.max(0, (e.clientX - rect.left) / zoom - draggingId.offsetX);
-    const nextY = Math.max(0, (e.clientY - rect.top) / zoom - draggingId.offsetY);
+    const curX = (e.clientX - rect.left) / zoom;
+    const curY = (e.clientY - rect.top) / zoom;
 
-    if (draggingId.kind === 'text') {
-      updateTextItem(draggingId.id, { x: nextX, topY: nextY });
-    } else {
-      setShapes((prev) =>
-        prev.map((s) => (s.id === draggingId.id ? { ...s, x: nextX, y: nextY } : s))
-      );
+    // Handle 8-point resizing of text block
+    if (resizingHandle) {
+      const deltaX = curX - resizingHandle.startX;
+      const targetItem = textItems.find((t) => t.id === resizingHandle.id);
+      if (!targetItem) return;
+
+      if (resizingHandle.handle === 'e') {
+        const nextW = Math.max(20, resizingHandle.startWidth + deltaX);
+        updateTextItem(resizingHandle.id, { width: nextW });
+      } else if (resizingHandle.handle === 'w') {
+        const nextW = Math.max(20, resizingHandle.startWidth - deltaX);
+        const nextX = resizingHandle.startXPos + deltaX;
+        updateTextItem(resizingHandle.id, { width: nextW, x: nextX });
+      } else if (resizingHandle.handle === 'se' || resizingHandle.handle === 'ne') {
+        // Corner scale: adjusts font size dynamically!
+        const scale = Math.max(0.4, (resizingHandle.startWidth + deltaX) / resizingHandle.startWidth);
+        const nextFontSize = Math.max(6, Math.min(96, Math.round(resizingHandle.startFontSize * scale * 2) / 2));
+        const nextW = Math.max(24, resizingHandle.startWidth * scale);
+        updateTextItem(resizingHandle.id, { fontSize: nextFontSize, width: nextW });
+      } else if (resizingHandle.handle === 'sw' || resizingHandle.handle === 'nw') {
+        const scale = Math.max(0.4, (resizingHandle.startWidth - deltaX) / resizingHandle.startWidth);
+        const nextFontSize = Math.max(6, Math.min(96, Math.round(resizingHandle.startFontSize * scale * 2) / 2));
+        const nextW = Math.max(24, resizingHandle.startWidth * scale);
+        const nextX = resizingHandle.startXPos + deltaX;
+        updateTextItem(resizingHandle.id, { fontSize: nextFontSize, width: nextW, x: nextX });
+      }
+      return;
+    }
+
+    // Handle moving text block or shape
+    if (draggingId) {
+      const nextX = Math.max(0, curX - draggingId.offsetX);
+      const nextY = Math.max(0, curY - draggingId.offsetY);
+
+      if (draggingId.kind === 'text') {
+        updateTextItem(draggingId.id, { x: nextX, topY: nextY });
+      } else {
+        setShapes((prev) =>
+          prev.map((s) => (s.id === draggingId.id ? { ...s, x: nextX, y: nextY } : s))
+        );
+      }
     }
   };
 
   const handleMouseUpOnPage = () => {
-    if (draggingId) setDraggingId(null);
+    if (draggingId || resizingHandle) {
+      pushHistory(textItems, shapes);
+      setDraggingId(null);
+      setResizingHandle(null);
+    }
+  };
+
+  // Replace Text ("Find & Replace") Logic
+  const matchingItems = textItems.filter((t) => {
+    if (!findQuery.trim()) return false;
+    if (replaceScope === 'current' && t.pageIndex !== currentPage - 1) return false;
+    if (t.isDeleted) return false;
+    return matchCase
+      ? t.text.includes(findQuery)
+      : t.text.toLowerCase().includes(findQuery.toLowerCase());
+  });
+
+  const handleReplaceAll = () => {
+    if (!findQuery.trim()) return;
+    let count = 0;
+    const nextItems = textItems.map((item) => {
+      if (replaceScope === 'current' && item.pageIndex !== currentPage - 1) return item;
+      if (item.isDeleted) return item;
+
+      const hasMatch = matchCase
+        ? item.text.includes(findQuery)
+        : item.text.toLowerCase().includes(findQuery.toLowerCase());
+
+      if (!hasMatch) return item;
+
+      count++;
+      let newStr = '';
+      if (matchCase) {
+        newStr = item.text.split(findQuery).join(replaceQuery);
+      } else {
+        const regex = new RegExp(findQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+        newStr = item.text.replace(regex, replaceQuery);
+      }
+
+      return {
+        ...item,
+        text: newStr,
+        width: Math.max(item.origWidth, newStr.length * item.fontSize * 0.58),
+      };
+    });
+
+    setTextItems(nextItems);
+    pushHistory(nextItems, shapes);
+    setReplaceModalOpen(false);
+    setStatusBanner({
+      type: 'success',
+      message: `Replaced ${count} occurrence${count === 1 ? '' : 's'} of "${findQuery}" with "${replaceQuery}"!`,
+    });
   };
 
   // Upload image to place on page
@@ -799,21 +1026,21 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
     const reader = new FileReader();
     reader.onload = () => {
       const id = `img-${Date.now()}`;
-      setShapes((prev) => [
-        ...prev,
-        {
-          id,
-          pageIndex: currentPage - 1,
-          kind: 'image',
-          x: pageDims.width * 0.25,
-          y: pageDims.height * 0.25,
-          width: 160,
-          height: 90,
-          color: '#ffffff',
-          opacity: 1,
-          imageDataUrl: reader.result as string,
-        },
-      ]);
+      const newShape: PdfAnnotationShape = {
+        id,
+        pageIndex: currentPage - 1,
+        kind: 'image',
+        x: pageDims.width * 0.25,
+        y: pageDims.height * 0.25,
+        width: 160,
+        height: 90,
+        color: '#ffffff',
+        opacity: 1,
+        imageDataUrl: reader.result as string,
+      };
+      const nextShapes = [...shapes, newShape];
+      setShapes(nextShapes);
+      pushHistory(textItems, nextShapes);
       setSelectedShapeId(id);
       setSelectedTextId(null);
     };
@@ -838,26 +1065,50 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
     }
 
     const id = `sig-${Date.now()}`;
-    setShapes((prev) => [
-      ...prev,
-      {
-        id,
-        pageIndex: currentPage - 1,
-        kind: 'signature',
-        x: pageDims.width * 0.35,
-        y: pageDims.height * 0.72,
-        width: 165,
-        height: 52,
-        color: '#0f172a',
-        opacity: 1,
-        imageDataUrl: dataUrl,
-      },
-    ]);
+    const newShape: PdfAnnotationShape = {
+      id,
+      pageIndex: currentPage - 1,
+      kind: 'signature',
+      x: pageDims.width * 0.35,
+      y: pageDims.height * 0.72,
+      width: 165,
+      height: 52,
+      color: '#0f172a',
+      opacity: 1,
+      imageDataUrl: dataUrl,
+    };
+    const nextShapes = [...shapes, newShape];
+    setShapes(nextShapes);
+    pushHistory(textItems, nextShapes);
     setSelectedShapeId(id);
     setSignatureModalOpen(false);
   };
 
-  // Generate a realistic editable sample PDF right in the browser if user clicks "Try Demo Editable PDF" in empty dropzone
+  const handleAddStamp = (stampText: string, stampColor: string, subtext?: string) => {
+    const dataUrl = generateStampDataUrl(stampText, stampColor, subtext);
+    if (!dataUrl) return;
+    const newShape: PdfAnnotationShape = {
+      id: `shape-stamp-${Date.now()}`,
+      pageIndex: currentPage - 1,
+      kind: 'stamp',
+      x: Math.max(30, pageDims.width / 2 - 70),
+      y: Math.max(30, pageDims.height / 2 - 30),
+      width: 140,
+      height: 60,
+      color: stampColor,
+      opacity: 0.95,
+      imageDataUrl: dataUrl,
+    };
+    const nextShapes = [...shapes, newShape];
+    setShapes(nextShapes);
+    pushHistory(textItems, nextShapes);
+    setSelectedShapeId(newShape.id);
+    setSelectedTextId(null);
+    setStampModalOpen(false);
+    setStatusBanner({ type: 'success', message: `Added "${stampText}" stamp to Page ${currentPage}` });
+  };
+
+  // Generate a realistic editable sample PDF
   const loadDemoEditablePdf = async () => {
     const doc = await PDFDocument.create();
     const helv = await doc.embedFont(StandardFonts.Helvetica);
@@ -995,7 +1246,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
     try {
       const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
 
-      // Embed complete 12-font standard PDF family (Sans, Serif, Mono in Regular, Bold, Italic, BoldItalic)
+      // Embed standard PDF font families
       const fontMap = {
         sans: {
           regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
@@ -1053,7 +1304,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
 
         if (!wasModified) continue;
 
-        // Step A: If this was an existing PDF text item, seamlessly cover the original PDF glyphs with the sampled background color
+        // Step A: Cover original PDF glyphs with sampled background color
         if (!item.isNew) {
           const bg = hexToRgb01(item.bgColor === 'transparent' ? '#ffffff' : item.bgColor);
           const origBaselinePdfY = pageH - item.origBaselineY;
@@ -1066,9 +1317,15 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           });
         }
 
-        // Step B: If not deleted and has non-empty text, draw the new crisp vector text at the exact baseline & constant font size
+        // Step B: Draw new crisp vector text
         if (!item.isDeleted && item.text.trim().length > 0) {
-          if (item.bgColor && item.bgColor !== 'transparent' && (item.isNew || Math.abs(item.x - item.origX) > 1 || Math.abs(item.topY - item.origTopY) > 1)) {
+          if (
+            item.bgColor &&
+            item.bgColor !== 'transparent' &&
+            (item.isNew ||
+              Math.abs(item.x - item.origX) > 1 ||
+              Math.abs(item.topY - item.origTopY) > 1)
+          ) {
             const bg = hexToRgb01(item.bgColor);
             const curBaselinePdfY = pageH - item.baselineY;
             pdfPage.drawRectangle({
@@ -1111,7 +1368,10 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
             color: rgb(c.r, c.g, c.b),
             opacity: shape.opacity,
           });
-        } else if ((shape.kind === 'image' || shape.kind === 'signature' || shape.kind === 'stamp') && shape.imageDataUrl) {
+        } else if (
+          (shape.kind === 'image' || shape.kind === 'signature' || shape.kind === 'stamp') &&
+          shape.imageDataUrl
+        ) {
           const isPng = shape.imageDataUrl.startsWith('data:image/png');
           const embeddedImg = isPng
             ? await pdfDoc.embedPng(shape.imageDataUrl)
@@ -1127,13 +1387,17 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
 
       // 3. Apply Watermarks if enabled
       if (watermarkSettings.enabled && watermarkSettings.text.trim()) {
-        const wmTargetPages = watermarkSettings.applyTo === 'all' ? pages : [pages[currentPage - 1]];
+        const wmTargetPages =
+          watermarkSettings.applyTo === 'all' ? pages : [pages[currentPage - 1]];
         const wmFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
         const wmc = hexToRgb01(watermarkSettings.color);
         for (const wp of wmTargetPages) {
           if (!wp) continue;
           const { width: pW, height: pH } = wp.getSize();
-          const textW = wmFont.widthOfTextAtSize(watermarkSettings.text, watermarkSettings.fontSize);
+          const textW = wmFont.widthOfTextAtSize(
+            watermarkSettings.text,
+            watermarkSettings.fontSize
+          );
           const rad = (watermarkSettings.rotation * Math.PI) / 180;
           wp.drawText(watermarkSettings.text, {
             x: pW / 2 - (textW / 2) * Math.cos(rad),
@@ -1172,9 +1436,35 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
 
   const currentPageItems = textItems.filter((t) => t.pageIndex === currentPage - 1);
   const currentPageShapes = shapes.filter((s) => s.pageIndex === currentPage - 1);
-  const modifiedCount = textItems.filter(
-    (t) => t.isDeleted || t.isNew || t.text !== t.origText || Math.abs(t.fontSize - t.origFontSize) > 0.2
-  ).length + shapes.length;
+  const modifiedCount =
+    textItems.filter(
+      (t) =>
+        t.isDeleted ||
+        t.isNew ||
+        t.text !== t.origText ||
+        Math.abs(t.fontSize - t.origFontSize) > 0.2
+    ).length + shapes.length;
+
+  // Floating toolbar coordinates calculation
+  let floatingStyle: React.CSSProperties | null = null;
+  if (selectedText) {
+    const textScreenLeft = (selectedText.x - 1) * zoom;
+    const textScreenTop = (selectedText.baselineY - selectedText.fontSize * 0.86) * zoom;
+    const isCloseToTop = textScreenTop < 56;
+    const topPos = isCloseToTop
+      ? textScreenTop + selectedText.fontSize * 1.25 * zoom + 8
+      : textScreenTop - 46;
+
+    const maxLeft = Math.max(10, pageDims.width * zoom - 440);
+    const leftPos = Math.max(8, Math.min(maxLeft, textScreenLeft));
+
+    floatingStyle = {
+      position: 'absolute',
+      left: `${leftPos}px`,
+      top: `${topPos}px`,
+      zIndex: 50,
+    };
+  }
 
   return (
     <div className="space-y-4">
@@ -1214,7 +1504,9 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  {isExporting ? 'Exporting PDF...' : `Download Edited PDF${modifiedCount > 0 ? ` (${modifiedCount} edits)` : ''}`}
+                  {isExporting
+                    ? 'Exporting PDF...'
+                    : `Download Edited PDF${modifiedCount > 0 ? ` (${modifiedCount} edits)` : ''}`}
                 </button>
               )}
             </div>
@@ -1222,7 +1514,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
 
           {showInfo && (
             <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
-              Click any existing text in your PDF to edit it directly in-place. The editor automatically preserves the original constant font size, matched font family (Sans-Serif, Serif, Monospace), bold/italic style, text color, and background fill, and exports a crisp vector PDF locally.
+              Professional-grade in-place PDF editor. Click any text to edit directly with constant font size, font family matching, floating action bar, drag-and-resize bounding boxes, find & replace, and universal undo/redo (Ctrl+Z). Runs 100% locally in your browser memory for total privacy.
             </p>
           )}
         </div>
@@ -1257,10 +1549,10 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           </div>
           <div className="space-y-1 max-w-md mx-auto">
             <h3 className="text-base font-bold text-white">
-              Click Any Text in a PDF to Edit It In-Place
+              Professional In-Place PDF Text Editor
             </h3>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Automatically detects original font family, constant point size, ink color, and background fill. Edit words, numbers, dates, or paragraphs directly on the page.
+              Edit text with constant font size and matched fonts, replace text across documents, whiteout unwanted details, add signatures, stamps, and watermarks—all with zero file uploads.
             </p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
@@ -1285,11 +1577,33 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Top Professional PDF Editor Ribbon / Toolbar */}
+          {/* Top Professional Ribbon Toolbar */}
           <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2.5 sticky top-14 z-20 backdrop-blur-md shadow-xl">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* Left: Editor Mode Tools */}
+              {/* Left: Tools + Undo/Redo + Replace Text */}
               <div className="flex flex-wrap items-center gap-1.5">
+                {/* Undo & Redo Controls */}
+                <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+                  <button
+                    onClick={handleUndo}
+                    disabled={historyIndex <= 0}
+                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
+                    title="Undo (Ctrl+Z / Cmd+Z)"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={handleRedo}
+                    disabled={historyIndex >= history.length - 1}
+                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
+                    title="Redo (Ctrl+Y / Cmd+Shift+Z)"
+                  >
+                    <Redo2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="h-5 w-px bg-slate-800 mx-0.5" />
+
                 <button
                   onClick={() => setToolMode('edit-text')}
                   className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
@@ -1301,6 +1615,20 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                 >
                   <Type className="w-3.5 h-3.5" />
                   <span>Edit PDF Text</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    if (selectedText) {
+                      setFindQuery(selectedText.text);
+                    }
+                    setReplaceModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                  title="Find & Replace text across the PDF (Ctrl+F)"
+                >
+                  <Replace className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Replace Text</span>
                 </button>
 
                 <button
@@ -1432,7 +1760,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                   <button
                     onClick={exportEditedPdf}
                     disabled={isExporting}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold cursor-pointer shadow-md"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>Download PDF</span>
@@ -1441,241 +1769,29 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
               </div>
             </div>
 
-            {/* Dynamic Typography & Formatting Inspector Bar when a Text Block is Selected */}
-            {selectedText ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/90 text-xs">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/40 text-indigo-300 font-semibold text-[11px]">
-                    {selectedText.isNew ? 'Added Text' : 'Matched PDF Text'}
-                  </span>
-
-                  {/* Font Family Selector */}
-                  <select
-                    aria-label="Font family"
-                    value={selectedText.fontFamily}
-                    onChange={(e) => {
-                      const val = e.target.value as PdfFontFamily;
-                      let newExactName = selectedText.exactFontName;
-                      if (val === 'calibri') newExactName = 'Calibri';
-                      else if (val === 'arial') newExactName = 'Arial';
-                      else if (val === 'helvetica') newExactName = 'Helvetica';
-                      else if (val === 'times') newExactName = 'Times New Roman';
-                      else if (val === 'georgia') newExactName = 'Georgia';
-                      else if (val === 'garamond') newExactName = 'Garamond';
-                      else if (val === 'roboto') newExactName = 'Roboto';
-                      else if (val === 'verdana') newExactName = 'Verdana';
-                      else if (val === 'courier') newExactName = 'Courier New';
-                      else if (val === 'mono') newExactName = 'Consolas';
-                      updateTextItem(selectedText.id, {
-                        fontFamily: val,
-                        exactFontName: newExactName,
-                      });
-                    }}
-                    className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white font-medium"
-                  >
-                    {selectedText.exactFontName && (
-                      <option value={selectedText.fontFamily}>
-                        Auto-Matched ({selectedText.exactFontName})
-                      </option>
-                    )}
-                    <option value="calibri">Calibri (Modern Sans)</option>
-                    <option value="arial">Arial (Standard Sans)</option>
-                    <option value="helvetica">Helvetica (Clean Sans)</option>
-                    <option value="times">Times New Roman (Formal Serif)</option>
-                    <option value="georgia">Georgia (Editorial Serif)</option>
-                    <option value="garamond">Garamond (Classic Serif)</option>
-                    <option value="roboto">Roboto (Tech Sans)</option>
-                    <option value="verdana">Verdana (Wide Sans)</option>
-                    <option value="courier">Courier New (Monospace)</option>
-                    <option value="mono">Consolas (Code Mono)</option>
-                  </select>
-
-                  {/* Constant Font Size Control */}
-                  <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-lg px-2 py-0.5">
-                    <span className="text-[10px] text-slate-400">Size:</span>
-                    <input
-                      type="number"
-                      step="0.5"
-                      min={4}
-                      max={120}
-                      value={selectedText.fontSize}
-                      onChange={(e) =>
-                        updateTextItem(selectedText.id, {
-                          fontSize: Math.max(4, parseFloat(e.target.value) || selectedText.origFontSize),
-                        })
-                      }
-                      className="w-12 bg-transparent text-center text-xs font-bold text-emerald-400 focus:outline-none"
-                      title="Constant PDF Font Size in Points (pt)"
-                    />
-                    <span className="text-[10px] text-slate-500">pt</span>
-                    {!selectedText.isNew && Math.abs(selectedText.fontSize - selectedText.origFontSize) > 0.1 && (
-                      <button
-                        onClick={() => updateTextItem(selectedText.id, { fontSize: selectedText.origFontSize })}
-                        className="text-[10px] text-indigo-400 hover:underline ml-1 cursor-pointer"
-                        title="Lock back to exact original PDF font size"
-                      >
-                        Lock {selectedText.origFontSize}pt
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Bold & Italic */}
-                  <button
-                    onClick={() => updateTextItem(selectedText.id, { bold: !selectedText.bold })}
-                    className={`p-1.5 rounded-lg border cursor-pointer ${
-                      selectedText.bold
-                        ? 'bg-indigo-600 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                    title="Bold"
-                  >
-                    <Bold className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    onClick={() => updateTextItem(selectedText.id, { italic: !selectedText.italic })}
-                    className={`p-1.5 rounded-lg border cursor-pointer ${
-                      selectedText.italic
-                        ? 'bg-indigo-600 border-indigo-500 text-white'
-                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
-                    }`}
-                    title="Italic"
-                  >
-                    <Italic className="w-3.5 h-3.5" />
-                  </button>
-
-                  {/* Text Color Picker */}
-                  <label
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer"
-                    title="Text Ink Color (Auto-sampled from original PDF)"
-                  >
-                    <span className="text-[10px] text-slate-400">Text</span>
-                    <input
-                      type="color"
-                      value={selectedText.textColor}
-                      onChange={(e) => updateTextItem(selectedText.id, { textColor: e.target.value })}
-                      className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent"
-                    />
-                  </label>
-
-                  {/* Background Patch Color Picker */}
-                  <label
-                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-slate-950 border border-slate-800 cursor-pointer"
-                    title="Background Fill Color covering original text"
-                  >
-                    <span className="text-[10px] text-slate-400">Bg</span>
-                    <input
-                      type="color"
-                      value={selectedText.bgColor === 'transparent' ? '#ffffff' : selectedText.bgColor}
-                      onChange={(e) => updateTextItem(selectedText.id, { bgColor: e.target.value })}
-                      className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent"
-                    />
-                  </label>
-                </div>
-
-                {/* Reset or Delete Text Block */}
-                <div className="flex items-center gap-1.5">
-                  {!selectedText.isNew && (
-                    <button
-                      onClick={() =>
-                        updateTextItem(selectedText.id, {
-                          text: selectedText.origText,
-                          fontSize: selectedText.origFontSize,
-                          x: selectedText.origX,
-                          topY: selectedText.origTopY,
-                          baselineY: selectedText.origBaselineY,
-                          isDeleted: false,
-                        })
-                      }
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 cursor-pointer"
-                      title="Restore original unmodified PDF text"
-                    >
-                      <RotateCcw className="w-3 h-3" />
-                      <span>Reset</span>
-                    </button>
-                  )}
-
-                  <button
-                    onClick={() => {
-                      if (selectedText.isNew) {
-                        setTextItems((prev) => prev.filter((t) => t.id !== selectedText.id));
-                      } else {
-                        updateTextItem(selectedText.id, { isDeleted: true, text: '' });
-                      }
-                      setSelectedTextId(null);
-                    }}
-                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/30 text-rose-300 cursor-pointer"
-                    title="Erase / Delete this text block from the PDF"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                    <span>Erase Text</span>
-                  </button>
-                </div>
-              </div>
-            ) : selectedShape ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/90 text-xs">
-                <div className="flex items-center gap-3">
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold capitalize">
-                    {selectedShape.kind} Annotation
-                  </span>
-                  <label className="inline-flex items-center gap-1.5 text-slate-300">
-                    <span>Width:</span>
-                    <input
-                      type="range"
-                      min={25}
-                      max={500}
-                      value={selectedShape.width}
-                      onChange={(e) =>
-                        setShapes((prev) =>
-                          prev.map((s) =>
-                            s.id === selectedShape.id ? { ...s, width: parseInt(e.target.value, 10) } : s
-                          )
-                        )
-                      }
-                      className="w-24"
-                    />
-                  </label>
-                  <label className="inline-flex items-center gap-1.5 text-slate-300">
-                    <span>Height:</span>
-                    <input
-                      type="range"
-                      min={12}
-                      max={350}
-                      value={selectedShape.height}
-                      onChange={(e) =>
-                        setShapes((prev) =>
-                          prev.map((s) =>
-                            s.id === selectedShape.id ? { ...s, height: parseInt(e.target.value, 10) } : s
-                          )
-                        )
-                      }
-                      className="w-24"
-                    />
-                  </label>
-                </div>
-                <button
-                  onClick={() => {
-                    setShapes((prev) => prev.filter((s) => s.id !== selectedShape.id));
-                    setSelectedShapeId(null);
-                  }}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 cursor-pointer"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Delete Annotation</span>
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/70 text-[11px] text-slate-400">
+            {/* Sub-bar Guidance */}
+            <div className="flex items-center justify-between pt-1 border-t border-slate-800/70 text-[11px] text-slate-400">
+              <span className="flex items-center gap-2">
                 <span>
                   {toolMode === 'edit-text' &&
-                    `Click any text on the page below to edit it in-place with constant font size (${currentPageItems.length} editable text blocks detected on Page ${currentPage}).`}
-                  {toolMode === 'add-text' && 'Click anywhere on the PDF page below to insert a new text box.'}
-                  {toolMode === 'whiteout' && 'Click anywhere on the PDF page below to place a whiteout / erase cover patch.'}
-                  {toolMode === 'highlight' && 'Click anywhere on the PDF page below to place a translucent highlight bar.'}
+                    `Click any text on the page below to edit it directly (${currentPageItems.length} editable blocks on Page ${currentPage}).`}
+                  {toolMode === 'add-text' &&
+                    'Click anywhere on the PDF page below to insert a new text block.'}
+                  {toolMode === 'whiteout' &&
+                    'Click anywhere on the PDF page below to place a whiteout / erase cover patch.'}
+                  {toolMode === 'highlight' &&
+                    'Click anywhere on the PDF page below to place a translucent highlight bar.'}
                 </span>
-                {isRendering && <span className="text-indigo-400 font-semibold">Scanning page fonts...</span>}
-              </div>
-            )}
+                {modifiedCount > 0 && (
+                  <span className="text-emerald-400 font-semibold">• {modifiedCount} edits ready</span>
+                )}
+              </span>
+              {isRendering ? (
+                <span className="text-indigo-400 font-semibold animate-pulse">Scanning page text...</span>
+              ) : (
+                <span className="hidden md:inline text-slate-500">Shortcuts: Ctrl+Z Undo • Ctrl+Y Redo • Ctrl+F Replace • Esc Deselect</span>
+              )}
+            </div>
           </div>
 
           {/* Interactive WYSIWYG PDF Page Canvas */}
@@ -1700,27 +1816,28 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
               />
 
               {/* Dynamic Watermark Overlay */}
-              {watermarkSettings.enabled && watermarkSettings.text.trim() && (
-                watermarkSettings.applyTo === 'all' || watermarkSettings.applyTo === 'current'
-              ) && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10">
-                  <div
-                    style={{
-                      transform: `rotate(${watermarkSettings.rotation}deg)`,
-                      fontSize: `${watermarkSettings.fontSize * zoom}px`,
-                      color: watermarkSettings.color,
-                      opacity: watermarkSettings.opacity,
-                      fontWeight: 800,
-                      letterSpacing: '0.12em',
-                      userSelect: 'none',
-                      whiteSpace: 'nowrap',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {watermarkSettings.text}
+              {watermarkSettings.enabled &&
+                watermarkSettings.text.trim() &&
+                (watermarkSettings.applyTo === 'all' ||
+                  watermarkSettings.applyTo === 'current') && (
+                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center overflow-hidden z-10">
+                    <div
+                      style={{
+                        transform: `rotate(${watermarkSettings.rotation}deg)`,
+                        fontSize: `${watermarkSettings.fontSize * zoom}px`,
+                        color: watermarkSettings.color,
+                        opacity: watermarkSettings.opacity,
+                        fontWeight: 800,
+                        letterSpacing: '0.12em',
+                        userSelect: 'none',
+                        whiteSpace: 'nowrap',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {watermarkSettings.text}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               {/* Layer 1: Whiteout, Highlight, Image, and Signature Shapes */}
               {currentPageShapes.map((shape) => {
@@ -1759,7 +1876,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                     }}
                     className={`cursor-move ${
                       isSelected
-                        ? 'ring-2 ring-indigo-500 z-20'
+                        ? 'ring-2 ring-indigo-500 z-20 shadow-md'
                         : 'hover:ring-1 hover:ring-indigo-400/70 z-10'
                     }`}
                   >
@@ -1770,11 +1887,29 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                         className="w-full h-full object-contain pointer-events-none"
                       />
                     )}
+
+                    {isSelected && (
+                      <div className="absolute -top-7 right-0 flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-md px-1.5 py-0.5 shadow-lg">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = shapes.filter((s) => s.id !== shape.id);
+                            setShapes(next);
+                            pushHistory(textItems, next);
+                            setSelectedShapeId(null);
+                          }}
+                          className="text-rose-400 hover:text-rose-300 p-0.5 cursor-pointer"
+                          title="Delete annotation"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 );
               })}
 
-              {/* Layer 2: Every Detected & Added PDF Text Block (In-Place Editable with Constant Font Size) */}
+              {/* Layer 2: Every Detected & Added PDF Text Block */}
               {currentPageItems.map((item) => {
                 const isSelected = item.id === selectedTextId;
                 const isModified =
@@ -1785,11 +1920,17 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                   Math.abs(item.topY - item.origTopY) > 0.5 ||
                   Math.abs(item.fontSize - item.origFontSize) > 0.2;
 
-                // If an existing item was moved or deleted, render a seamless background patch over its original coordinates
+                const isFindMatch =
+                  findQuery.trim().length > 0 &&
+                  (matchCase
+                    ? item.text.includes(findQuery)
+                    : item.text.toLowerCase().includes(findQuery.toLowerCase()));
+
                 const showOrigCover = !item.isNew && isModified;
 
                 return (
                   <React.Fragment key={item.id}>
+                    {/* Background mask covering original PDF text */}
                     {showOrigCover && (
                       <div
                         style={{
@@ -1825,37 +1966,131 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                                 : item.bgColor
                               : 'transparent',
                         }}
-                        className={`group transition-colors ${
+                        className={`group transition-all ${
                           isSelected
-                            ? 'ring-2 ring-indigo-500 z-30 shadow-sm'
+                            ? 'ring-2 ring-blue-500 z-30 shadow-md bg-white/40'
+                            : isFindMatch
+                            ? 'ring-2 ring-amber-400 bg-amber-300/30 z-25'
                             : isModified
-                            ? 'ring-1 ring-emerald-500/60 hover:ring-indigo-500 z-20'
-                            : 'hover:ring-1 hover:ring-indigo-500/70 hover:bg-indigo-500/5 z-10'
+                            ? 'ring-1 ring-emerald-500/60 hover:ring-blue-500 z-20'
+                            : 'hover:ring-1 hover:ring-blue-500/70 hover:bg-blue-500/5 z-10'
                         }`}
                       >
-                        {/* Drag Handle when selected */}
+                        {/* 8-Point Transform Bounding Box Handles when selected */}
                         {isSelected && (
-                          <button
-                            type="button"
-                            onMouseDown={(e) => {
-                              e.stopPropagation();
-                              const rect = pageContainerRef.current!.getBoundingClientRect();
-                              setDraggingId({
-                                kind: 'text',
-                                id: item.id,
-                                offsetX: (e.clientX - rect.left) / zoom - item.x,
-                                offsetY: (e.clientY - rect.top) / zoom - item.topY,
-                              });
-                            }}
-                            title="Drag to reposition text"
-                            className="absolute -left-5 top-0 w-4 h-4 rounded bg-indigo-600 text-white flex items-center justify-center cursor-move shadow"
-                          >
-                            <Move className="w-2.5 h-2.5" />
-                          </button>
+                          <>
+                            {/* Move / Drag Handle Anchor */}
+                            <div
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = pageContainerRef.current!.getBoundingClientRect();
+                                setDraggingId({
+                                  kind: 'text',
+                                  id: item.id,
+                                  offsetX: (e.clientX - rect.left) / zoom - item.x,
+                                  offsetY: (e.clientY - rect.top) / zoom - item.topY,
+                                });
+                              }}
+                              className="absolute -top-3 left-1/2 -translate-x-1/2 w-4 h-3 bg-blue-600 rounded-t-sm flex items-center justify-center cursor-move text-white shadow-xs"
+                              title="Drag to reposition text"
+                            >
+                              <Move className="w-2.5 h-2.5" />
+                            </div>
+
+                            {/* Corner handles (dynamic scale font size) */}
+                            <div
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = pageContainerRef.current!.getBoundingClientRect();
+                                setResizingHandle({
+                                  id: item.id,
+                                  handle: 'se',
+                                  startX: (e.clientX - rect.left) / zoom,
+                                  startY: (e.clientY - rect.top) / zoom,
+                                  startWidth: item.width,
+                                  startFontSize: item.fontSize,
+                                  startXPos: item.x,
+                                });
+                              }}
+                              className="absolute -bottom-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-full cursor-nwse-resize z-40 shadow-xs"
+                              title="Drag corner to scale font size"
+                            />
+                            <div
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = pageContainerRef.current!.getBoundingClientRect();
+                                setResizingHandle({
+                                  id: item.id,
+                                  handle: 'sw',
+                                  startX: (e.clientX - rect.left) / zoom,
+                                  startY: (e.clientY - rect.top) / zoom,
+                                  startWidth: item.width,
+                                  startFontSize: item.fontSize,
+                                  startXPos: item.x,
+                                });
+                              }}
+                              className="absolute -bottom-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-full cursor-nesw-resize z-40 shadow-xs"
+                              title="Drag corner to scale font size"
+                            />
+                            <div
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = pageContainerRef.current!.getBoundingClientRect();
+                                setResizingHandle({
+                                  id: item.id,
+                                  handle: 'ne',
+                                  startX: (e.clientX - rect.left) / zoom,
+                                  startY: (e.clientY - rect.top) / zoom,
+                                  startWidth: item.width,
+                                  startFontSize: item.fontSize,
+                                  startXPos: item.x,
+                                });
+                              }}
+                              className="absolute -top-1.5 -right-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-full cursor-nesw-resize z-40 shadow-xs"
+                              title="Drag corner to scale font size"
+                            />
+                            <div
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = pageContainerRef.current!.getBoundingClientRect();
+                                setResizingHandle({
+                                  id: item.id,
+                                  handle: 'nw',
+                                  startX: (e.clientX - rect.left) / zoom,
+                                  startY: (e.clientY - rect.top) / zoom,
+                                  startWidth: item.width,
+                                  startFontSize: item.fontSize,
+                                  startXPos: item.x,
+                                });
+                              }}
+                              className="absolute -top-1.5 -left-1.5 w-3 h-3 bg-white border-2 border-blue-600 rounded-full cursor-nwse-resize z-40 shadow-xs"
+                              title="Drag corner to scale font size"
+                            />
+
+                            {/* Side handles (adjust width) */}
+                            <div
+                              onMouseDown={(e) => {
+                                e.stopPropagation();
+                                const rect = pageContainerRef.current!.getBoundingClientRect();
+                                setResizingHandle({
+                                  id: item.id,
+                                  handle: 'e',
+                                  startX: (e.clientX - rect.left) / zoom,
+                                  startY: (e.clientY - rect.top) / zoom,
+                                  startWidth: item.width,
+                                  startFontSize: item.fontSize,
+                                  startXPos: item.x,
+                                });
+                              }}
+                              className="absolute top-1/2 -translate-y-1/2 -right-1.5 w-2 h-3.5 bg-blue-600 rounded-xs cursor-ew-resize z-40 shadow-xs"
+                              title="Drag to adjust width"
+                            />
+                          </>
                         )}
 
                         {isSelected ? (
                           <input
+                            ref={activeInputRef}
                             type="text"
                             autoFocus
                             value={item.text}
@@ -1863,12 +2098,30 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                               const nextVal = e.target.value;
                               const estimatedW = Math.max(
                                 item.origWidth,
-                                nextVal.length * item.fontSize * 0.56
+                                (nextVal.length + 1) * item.fontSize * 0.58
                               );
                               updateTextItem(item.id, {
                                 text: nextVal,
                                 width: estimatedW,
                               });
+                            }}
+                            onBlur={() => {
+                              pushHistory(textItems, shapes);
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                pushHistory(textItems, shapes);
+                                setSelectedTextId(null);
+                              } else if (e.key === 'Tab') {
+                                e.preventDefault();
+                                const idx = currentPageItems.findIndex((t) => t.id === item.id);
+                                const next = currentPageItems[(idx + 1) % currentPageItems.length];
+                                if (next) {
+                                  pushHistory(textItems, shapes);
+                                  setSelectedTextId(next.id);
+                                }
+                              }
                             }}
                             style={{
                               fontFamily: cssFontStack(item.fontFamily, item.exactFontName),
@@ -1906,6 +2159,313 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                   </React.Fragment>
                 );
               })}
+
+              {/* PDFSimpli-Grade Floating Contextual Action Toolbar directly over active text block */}
+              {selectedText && floatingStyle && (
+                <div
+                  style={floatingStyle}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 bg-slate-900 border border-slate-700 rounded-xl px-2.5 py-1.5 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 text-xs text-white"
+                >
+                  {/* Font Family selector */}
+                  <select
+                    aria-label="Font family"
+                    value={selectedText.fontFamily}
+                    onChange={(e) => {
+                      const val = e.target.value as PdfFontFamily;
+                      let newExactName = selectedText.exactFontName;
+                      if (val === 'calibri') newExactName = 'Calibri';
+                      else if (val === 'arial') newExactName = 'Arial';
+                      else if (val === 'helvetica') newExactName = 'Helvetica';
+                      else if (val === 'times') newExactName = 'Times New Roman';
+                      else if (val === 'georgia') newExactName = 'Georgia';
+                      else if (val === 'garamond') newExactName = 'Garamond';
+                      else if (val === 'roboto') newExactName = 'Roboto';
+                      else if (val === 'verdana') newExactName = 'Verdana';
+                      else if (val === 'courier') newExactName = 'Courier New';
+                      else if (val === 'mono') newExactName = 'Consolas';
+                      updateTextItem(
+                        selectedText.id,
+                        { fontFamily: val, exactFontName: newExactName },
+                        true
+                      );
+                    }}
+                    className="px-2 py-0.5 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-100 font-medium max-w-[125px] truncate cursor-pointer"
+                  >
+                    <option value={selectedText.fontFamily}>
+                      {selectedText.exactFontName || 'Detected Font'}
+                    </option>
+                    <option value="calibri">Calibri</option>
+                    <option value="arial">Arial</option>
+                    <option value="helvetica">Helvetica</option>
+                    <option value="times">Times New Roman</option>
+                    <option value="georgia">Georgia</option>
+                    <option value="garamond">Garamond</option>
+                    <option value="roboto">Roboto</option>
+                    <option value="verdana">Verdana</option>
+                    <option value="courier">Courier New</option>
+                    <option value="mono">Consolas</option>
+                  </select>
+
+                  {/* Font Size Decrement & Increment */}
+                  <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg p-0.5">
+                    <button
+                      onClick={() =>
+                        updateTextItem(
+                          selectedText.id,
+                          { fontSize: Math.max(4, selectedText.fontSize - 1) },
+                          true
+                        )
+                      }
+                      className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white cursor-pointer"
+                      title="Decrease font size"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-[11px] font-mono-code font-bold text-emerald-400 px-1.5 w-7 text-center">
+                      {Math.round(selectedText.fontSize)}
+                    </span>
+                    <button
+                      onClick={() =>
+                        updateTextItem(
+                          selectedText.id,
+                          { fontSize: Math.min(120, selectedText.fontSize + 1) },
+                          true
+                        )
+                      }
+                      className="p-1 hover:bg-slate-800 rounded text-slate-300 hover:text-white cursor-pointer"
+                      title="Increase font size"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Bold & Italic Toggles */}
+                  <div className="flex items-center bg-slate-950 border border-slate-700 rounded-lg p-0.5">
+                    <button
+                      onClick={() =>
+                        updateTextItem(selectedText.id, { bold: !selectedText.bold }, true)
+                      }
+                      className={`p-1 rounded cursor-pointer ${
+                        selectedText.bold ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Bold"
+                    >
+                      <Bold className="w-3 h-3" />
+                    </button>
+                    <button
+                      onClick={() =>
+                        updateTextItem(selectedText.id, { italic: !selectedText.italic }, true)
+                      }
+                      className={`p-1 rounded cursor-pointer ${
+                        selectedText.italic ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="Italic"
+                    >
+                      <Italic className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  {/* Text Color Picker */}
+                  <label
+                    className="p-1 rounded-lg bg-slate-950 border border-slate-700 cursor-pointer flex items-center gap-1"
+                    title="Change text ink color"
+                  >
+                    <span
+                      style={{ backgroundColor: selectedText.textColor }}
+                      className="w-3.5 h-3.5 rounded-full border border-white/30 inline-block"
+                    />
+                    <input
+                      type="color"
+                      value={selectedText.textColor}
+                      onChange={(e) =>
+                        updateTextItem(selectedText.id, { textColor: e.target.value }, true)
+                      }
+                      className="sr-only"
+                    />
+                  </label>
+
+                  {/* Find & Replace Shortcut */}
+                  <button
+                    onClick={() => {
+                      setFindQuery(selectedText.text);
+                      setReplaceModalOpen(true);
+                    }}
+                    className="p-1 rounded-lg bg-slate-950 border border-slate-700 text-amber-400 hover:text-amber-300 hover:bg-slate-800 cursor-pointer"
+                    title="Replace all occurrences of this text across the document"
+                  >
+                    <Replace className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Reset Original Text */}
+                  {!selectedText.isNew && (
+                    <button
+                      onClick={() =>
+                        updateTextItem(
+                          selectedText.id,
+                          {
+                            text: selectedText.origText,
+                            fontSize: selectedText.origFontSize,
+                            x: selectedText.origX,
+                            topY: selectedText.origTopY,
+                            baselineY: selectedText.origBaselineY,
+                            isDeleted: false,
+                          },
+                          true
+                        )
+                      }
+                      className="p-1 rounded-lg bg-slate-950 border border-slate-700 text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer"
+                      title="Revert back to original PDF text"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Erase / Trash */}
+                  <button
+                    onClick={() => {
+                      let next: EditablePdfTextItem[];
+                      if (selectedText.isNew) {
+                        next = textItems.filter((t) => t.id !== selectedText.id);
+                      } else {
+                        next = textItems.map((t) =>
+                          t.id === selectedText.id ? { ...t, isDeleted: true, text: '' } : t
+                        );
+                      }
+                      setTextItems(next);
+                      pushHistory(next, shapes);
+                      setSelectedTextId(null);
+                    }}
+                    className="p-1 rounded-lg bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500/30 cursor-pointer"
+                    title="Erase / Delete this text block"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+
+                  {/* Commit Done */}
+                  <button
+                    onClick={() => {
+                      pushHistory(textItems, shapes);
+                      setSelectedTextId(null);
+                    }}
+                    className="p-1 rounded-lg bg-emerald-500 text-slate-950 hover:bg-emerald-400 cursor-pointer font-bold"
+                    title="Done editing (Enter / Esc)"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDFSimpli-Style "Replace Text" / Find & Replace Modal */}
+      {replaceModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                <Replace className="w-4 h-4 text-amber-400" />
+                Find & Replace PDF Text
+              </h3>
+              <button
+                onClick={() => setReplaceModalOpen(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Search for any word, date, name, or phrase across your document and replace all instances in a single click with preserved fonts.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Find Text</label>
+                <div className="relative">
+                  <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    value={findQuery}
+                    onChange={(e) => setFindQuery(e.target.value)}
+                    placeholder="e.g. Old Company LLC or $500.00"
+                    autoFocus
+                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Replace With</label>
+                <input
+                  type="text"
+                  value={replaceQuery}
+                  onChange={(e) => setReplaceQuery(e.target.value)}
+                  placeholder="e.g. New Company LLC or $750.00"
+                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setReplaceScope('current')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                      replaceScope === 'current'
+                        ? 'bg-amber-400 text-slate-950'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800'
+                    }`}
+                  >
+                    Current Page ({currentPage})
+                  </button>
+                  <button
+                    onClick={() => setReplaceScope('all')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
+                      replaceScope === 'all'
+                        ? 'bg-amber-400 text-slate-950'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800'
+                    }`}
+                  >
+                    All Pages ({pageCount})
+                  </button>
+                </div>
+
+                <label className="inline-flex items-center gap-1.5 text-slate-400 cursor-pointer text-[11px]">
+                  <input
+                    type="checkbox"
+                    checked={matchCase}
+                    onChange={(e) => setMatchCase(e.target.checked)}
+                    className="rounded bg-slate-950 border-slate-800 text-amber-500"
+                  />
+                  <span>Match Case</span>
+                </label>
+              </div>
+
+              {findQuery.trim().length > 0 && (
+                <div className="p-2.5 rounded-xl bg-amber-400/10 border border-amber-400/30 flex items-center justify-between text-xs text-amber-300">
+                  <span>
+                    Found <strong className="text-amber-200">{matchingItems.length}</strong> matching block{matchingItems.length === 1 ? '' : 's'} {replaceScope === 'current' ? `on Page ${currentPage}` : 'across document'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button
+                onClick={() => setReplaceModalOpen(false)}
+                className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleReplaceAll}
+                disabled={!findQuery.trim() || matchingItems.length === 0}
+                className="px-4 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 disabled:opacity-40 text-slate-950 text-xs font-bold shadow-md cursor-pointer"
+              >
+                Replace All ({matchingItems.length})
+              </button>
             </div>
           </div>
         </div>
