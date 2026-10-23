@@ -33,7 +33,19 @@ import {
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
-export type PdfFontFamily = 'sans' | 'serif' | 'mono';
+export type PdfFontFamily =
+  | 'sans'
+  | 'serif'
+  | 'mono'
+  | 'calibri'
+  | 'arial'
+  | 'helvetica'
+  | 'times'
+  | 'georgia'
+  | 'garamond'
+  | 'roboto'
+  | 'verdana'
+  | 'courier';
 
 export interface EditablePdfTextItem {
   id: string;
@@ -54,6 +66,8 @@ export interface EditablePdfTextItem {
   height: number;
   text: string;
   fontSize: number;
+  fontName: string;
+  exactFontName: string; // e.g. "Calibri", "Arial", "Times New Roman"
   fontFamily: PdfFontFamily;
   bold: boolean;
   italic: boolean;
@@ -157,8 +171,12 @@ function generateStampDataUrl(text: string, color: string, subtext?: string): st
 function detectFontMetadata(
   fontName: string,
   fontFamilyHint: string
-): { family: PdfFontFamily; bold: boolean; italic: boolean } {
-  const combined = `${fontName} ${fontFamilyHint}`.toLowerCase();
+): { cleanName: string; family: PdfFontFamily; bold: boolean; italic: boolean } {
+  // Strip 6-letter subset prefix like "ABCDEF+" or "BAAAAA+"
+  let name = (fontName || '').replace(/^[A-Z]{6}\+/, '').trim();
+  const hint = (fontFamilyHint || '').trim();
+  const combined = `${name} ${hint}`.toLowerCase();
+
   const bold =
     combined.includes('bold') ||
     combined.includes('black') ||
@@ -166,35 +184,86 @@ function detectFontMetadata(
     combined.includes('semibold') ||
     combined.includes('demi') ||
     combined.includes('-bd') ||
-    combined.includes(',bold');
+    combined.includes(',bold') ||
+    combined.includes('700') ||
+    combined.includes('800') ||
+    combined.includes('900');
+
   const italic =
     combined.includes('italic') ||
     combined.includes('oblique') ||
     combined.includes('-it') ||
     combined.includes(',italic');
 
+  let cleanName = name
+    .replace(/PSMT$/i, '')
+    .replace(/-?BoldMT$/i, '')
+    .replace(/-?ItalicMT$/i, '')
+    .replace(/-?BoldItalicMT$/i, '')
+    .replace(/-?Bold$/i, '')
+    .replace(/-?Italic$/i, '')
+    .replace(/-?Regular$/i, '')
+    .replace(/-?Roman$/i, '')
+    .replace(/-?Medium$/i, '')
+    .replace(/MT$/i, '')
+    .trim();
+
   let family: PdfFontFamily = 'sans';
-  if (
-    combined.includes('times') ||
-    combined.includes('serif') && !combined.includes('sans') ||
-    combined.includes('georgia') ||
-    combined.includes('garamond') ||
+
+  if (combined.includes('calibri') || combined.includes('carlito')) {
+    cleanName = 'Calibri';
+    family = 'calibri';
+  } else if (combined.includes('times') || combined.includes('timesnewroman')) {
+    cleanName = 'Times New Roman';
+    family = 'times';
+  } else if (combined.includes('georgia')) {
+    cleanName = 'Georgia';
+    family = 'georgia';
+  } else if (combined.includes('garamond')) {
+    cleanName = 'Garamond';
+    family = 'garamond';
+  } else if (
     combined.includes('cambria') ||
     combined.includes('palatino') ||
-    combined.includes('roman')
+    combined.includes('baskerville') ||
+    (combined.includes('serif') && !combined.includes('sans'))
   ) {
-    family = 'serif';
+    cleanName = 'Times New Roman';
+    family = 'times';
+  } else if (combined.includes('arial') || combined.includes('arimo')) {
+    cleanName = 'Arial';
+    family = 'arial';
+  } else if (combined.includes('helvetica')) {
+    cleanName = 'Helvetica';
+    family = 'helvetica';
+  } else if (combined.includes('roboto')) {
+    cleanName = 'Roboto';
+    family = 'roboto';
+  } else if (combined.includes('open sans') || combined.includes('opensans')) {
+    cleanName = 'Open Sans';
+    family = 'sans';
+  } else if (combined.includes('verdana')) {
+    cleanName = 'Verdana';
+    family = 'verdana';
+  } else if (combined.includes('trebuchet')) {
+    cleanName = 'Trebuchet MS';
+    family = 'sans';
+  } else if (combined.includes('courier')) {
+    cleanName = 'Courier New';
+    family = 'courier';
   } else if (
-    combined.includes('courier') ||
-    combined.includes('mono') ||
     combined.includes('consolas') ||
     combined.includes('menlo') ||
-    combined.includes('code')
+    combined.includes('mono')
   ) {
+    cleanName = 'Consolas';
     family = 'mono';
+  } else {
+    cleanName = 'Arial';
+    family = 'sans';
   }
 
-  return { family, bold, italic };
+  return { cleanName, family, bold, italic };
 }
 
 /**
@@ -347,10 +416,35 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
   const selectedText = textItems.find((t) => t.id === selectedTextId) || null;
   const selectedShape = shapes.find((s) => s.id === selectedShapeId) || null;
 
-  const cssFontStack = (family: PdfFontFamily) => {
-    if (family === 'serif') return 'Georgia, "Times New Roman", Times, serif';
-    if (family === 'mono') return '"JetBrains Mono", "Courier New", Courier, monospace';
-    return 'Helvetica, Arial, Inter, system-ui, sans-serif';
+  const cssFontStack = (family: PdfFontFamily, exactFontName?: string) => {
+    const prefix = exactFontName ? `"${exactFontName}", ` : '';
+    switch (family) {
+      case 'calibri':
+        return `${prefix}Calibri, "Carlito", "Segoe UI", Arial, sans-serif`;
+      case 'arial':
+        return `${prefix}Arial, "Helvetica Neue", Helvetica, sans-serif`;
+      case 'helvetica':
+        return `${prefix}Helvetica, "Helvetica Neue", Arial, sans-serif`;
+      case 'times':
+        return `${prefix}"Times New Roman", Times, "Liberation Serif", Georgia, serif`;
+      case 'georgia':
+        return `${prefix}Georgia, "Times New Roman", Times, serif`;
+      case 'garamond':
+        return `${prefix}Garamond, "EB Garamond", Georgia, serif`;
+      case 'serif':
+        return `${prefix}Georgia, "Times New Roman", Times, Cambria, serif`;
+      case 'roboto':
+        return `${prefix}Roboto, "Open Sans", Arial, sans-serif`;
+      case 'verdana':
+        return `${prefix}Verdana, Tahoma, Arial, sans-serif`;
+      case 'courier':
+        return `${prefix}"Courier New", Courier, "Liberation Mono", monospace`;
+      case 'mono':
+        return `${prefix}Consolas, Menlo, Monaco, "Courier New", monospace`;
+      case 'sans':
+      default:
+        return `${prefix}-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, Helvetica, sans-serif`;
+    }
   };
 
   // Load a new PDF file into the editor
@@ -431,6 +525,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           height: number;
           fontSize: number;
           fontName: string;
+          exactFontName: string;
           family: PdfFontFamily;
           bold: boolean;
           italic: boolean;
@@ -451,9 +546,22 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
           const topY = baselineY - fontSize * 0.84;
 
           const styleObj = styles[item.fontName] || {};
-          const { family, bold, italic } = detectFontMetadata(
-            item.fontName || '',
-            styleObj.fontFamily || ''
+          let fontHint = styleObj.fontFamily || '';
+          let resolvedFontName = item.fontName || '';
+          try {
+            if ((page as any).commonObjs && (page as any).commonObjs.has(item.fontName)) {
+              const fObj = (page as any).commonObjs.get(item.fontName);
+              if (fObj) {
+                resolvedFontName = fObj.name || fObj.fallbackName || fObj.loadedName || resolvedFontName;
+              }
+            }
+          } catch {
+            // ignore
+          }
+
+          const { cleanName, family, bold, italic } = detectFontMetadata(
+            resolvedFontName,
+            fontHint
           );
 
           rawRuns.push({
@@ -464,7 +572,8 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
             width,
             height,
             fontSize,
-            fontName: item.fontName || '',
+            fontName: resolvedFontName,
+            exactFontName: cleanName,
             family,
             bold,
             italic,
@@ -535,6 +644,8 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
             height: r.height,
             text: r.str,
             fontSize: r.fontSize,
+            fontName: r.fontName,
+            exactFontName: r.exactFontName,
             fontFamily: r.family,
             bold: r.bold,
             italic: r.italic,
@@ -610,7 +721,9 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
         height: defaultSize * 1.15,
         text: 'Type new text...',
         fontSize: defaultSize,
-        fontFamily: 'sans',
+        fontName: 'Arial',
+        exactFontName: 'Arial',
+        fontFamily: 'arial',
         bold: false,
         italic: false,
         textColor: '#0f172a',
@@ -905,7 +1018,17 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
       };
 
       const pickEmbeddedFont = (family: PdfFontFamily, bold: boolean, italic: boolean) => {
-        const group = fontMap[family] || fontMap.sans;
+        let group = fontMap.sans;
+        if (
+          family === 'serif' ||
+          family === 'times' ||
+          family === 'georgia' ||
+          family === 'garamond'
+        ) {
+          group = fontMap.serif;
+        } else if (family === 'mono' || family === 'courier') {
+          group = fontMap.mono;
+        }
         if (bold && italic) return group.boldItalic;
         if (bold) return group.bold;
         if (italic) return group.italic;
@@ -1330,14 +1453,41 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                   <select
                     aria-label="Font family"
                     value={selectedText.fontFamily}
-                    onChange={(e) =>
-                      updateTextItem(selectedText.id, { fontFamily: e.target.value as PdfFontFamily })
-                    }
+                    onChange={(e) => {
+                      const val = e.target.value as PdfFontFamily;
+                      let newExactName = selectedText.exactFontName;
+                      if (val === 'calibri') newExactName = 'Calibri';
+                      else if (val === 'arial') newExactName = 'Arial';
+                      else if (val === 'helvetica') newExactName = 'Helvetica';
+                      else if (val === 'times') newExactName = 'Times New Roman';
+                      else if (val === 'georgia') newExactName = 'Georgia';
+                      else if (val === 'garamond') newExactName = 'Garamond';
+                      else if (val === 'roboto') newExactName = 'Roboto';
+                      else if (val === 'verdana') newExactName = 'Verdana';
+                      else if (val === 'courier') newExactName = 'Courier New';
+                      else if (val === 'mono') newExactName = 'Consolas';
+                      updateTextItem(selectedText.id, {
+                        fontFamily: val,
+                        exactFontName: newExactName,
+                      });
+                    }}
                     className="px-2.5 py-1 rounded-lg bg-slate-950 border border-slate-800 text-xs text-white font-medium"
                   >
-                    <option value="sans">Sans-Serif (Helvetica / Arial)</option>
-                    <option value="serif">Serif (Times New Roman)</option>
-                    <option value="mono">Monospace (Courier)</option>
+                    {selectedText.exactFontName && (
+                      <option value={selectedText.fontFamily}>
+                        Auto-Matched ({selectedText.exactFontName})
+                      </option>
+                    )}
+                    <option value="calibri">Calibri (Modern Sans)</option>
+                    <option value="arial">Arial (Standard Sans)</option>
+                    <option value="helvetica">Helvetica (Clean Sans)</option>
+                    <option value="times">Times New Roman (Formal Serif)</option>
+                    <option value="georgia">Georgia (Editorial Serif)</option>
+                    <option value="garamond">Garamond (Classic Serif)</option>
+                    <option value="roboto">Roboto (Tech Sans)</option>
+                    <option value="verdana">Verdana (Wide Sans)</option>
+                    <option value="courier">Courier New (Monospace)</option>
+                    <option value="mono">Consolas (Code Mono)</option>
                   </select>
 
                   {/* Constant Font Size Control */}
@@ -1721,7 +1871,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                               });
                             }}
                             style={{
-                              fontFamily: cssFontStack(item.fontFamily),
+                              fontFamily: cssFontStack(item.fontFamily, item.exactFontName),
                               fontSize: `${item.fontSize * zoom}px`,
                               fontWeight: item.bold ? 700 : 400,
                               fontStyle: item.italic ? 'italic' : 'normal',
@@ -1737,7 +1887,7 @@ export const PdfEditor: React.FC<{ embedded?: boolean }> = ({ embedded = false }
                         ) : (
                           <span
                             style={{
-                              fontFamily: cssFontStack(item.fontFamily),
+                              fontFamily: cssFontStack(item.fontFamily, item.exactFontName),
                               fontSize: `${item.fontSize * zoom}px`,
                               fontWeight: item.bold ? 700 : 400,
                               fontStyle: item.italic ? 'italic' : 'normal',
