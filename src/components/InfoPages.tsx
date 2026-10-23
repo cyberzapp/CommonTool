@@ -49,9 +49,9 @@ export const STATIC_PAGES_META: Record<
   'how-to-use': {
     path: '/how-to-use',
     label: 'How to Use',
-    seoTitle: 'How to Use CommonTool — Step-by-Step Guides for All 18 Utilities',
+    seoTitle: 'How to Use CommonTool — Step-by-Step Guides for All Workspace Utilities',
     seoDescription:
-      'Step-by-step instructions, tips, and answers for using all 18 client-side PDF, media, OCR, invoice, financial, academic, and developer utilities.',
+      'Step-by-step instructions, tips, and answers for using all client-side PDF, media, OCR, forms, AI translation, summarization, financial, and developer utilities.',
   },
   donate: {
     path: '/donate',

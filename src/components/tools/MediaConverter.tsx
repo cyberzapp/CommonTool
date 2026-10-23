@@ -12,7 +12,62 @@ import {
 } from 'lucide-react';
 
 type MediaTab = 'image-convert' | 'heic-convert' | 'av-trimmer';
-type TargetImageFormat = 'png' | 'jpeg' | 'webp' | 'svg';
+type TargetImageFormat = 'png' | 'jpeg' | 'webp' | 'svg' | 'tiff';
+
+function canvasToTiffBlob(canvas: HTMLCanvasElement): Blob {
+  const ctx = canvas.getContext('2d')!;
+  const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const width = canvas.width;
+  const height = canvas.height;
+  const numPixels = width * height;
+  const byteCount = numPixels * 4;
+
+  const numTags = 9;
+  const ifdOffset = 8;
+  const ifdSize = 2 + numTags * 12 + 4;
+  const valueDataOffset = ifdOffset + ifdSize;
+  const pixelDataOffset = valueDataOffset + 8;
+  const totalFileSize = pixelDataOffset + byteCount;
+
+  const buffer = new ArrayBuffer(totalFileSize);
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+
+  view.setUint16(0, 0x4949, true); // Little endian "II"
+  view.setUint16(2, 42, true);
+  view.setUint32(4, ifdOffset, true);
+
+  let pos = ifdOffset;
+  view.setUint16(pos, numTags, true);
+  pos += 2;
+
+  const writeTag = (tag: number, type: number, count: number, val: number) => {
+    view.setUint16(pos, tag, true);
+    view.setUint16(pos + 2, type, true);
+    view.setUint32(pos + 4, count, true);
+    view.setUint32(pos + 8, val, true);
+    pos += 12;
+  };
+
+  writeTag(256, 4, 1, width); // ImageWidth
+  writeTag(257, 4, 1, height); // ImageLength
+  writeTag(258, 3, 4, valueDataOffset); // BitsPerSample
+  writeTag(259, 3, 1, 1); // Compression (None)
+  writeTag(262, 3, 1, 2); // Photometric (RGB)
+  writeTag(273, 4, 1, pixelDataOffset); // StripOffsets
+  writeTag(277, 3, 1, 4); // SamplesPerPixel (RGBA)
+  writeTag(278, 4, 1, height); // RowsPerStrip
+  writeTag(279, 4, 1, byteCount); // StripByteCounts
+  view.setUint32(pos, 0, true);
+
+  view.setUint16(valueDataOffset, 8, true);
+  view.setUint16(valueDataOffset + 2, 8, true);
+  view.setUint16(valueDataOffset + 4, 8, true);
+  view.setUint16(valueDataOffset + 6, 8, true);
+
+  bytes.set(imgData.data, pixelDataOffset);
+  return new Blob([buffer], { type: 'image/tiff' });
+}
 
 export const MediaConverter: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MediaTab>('image-convert');
@@ -108,6 +163,12 @@ export const MediaConverter: React.FC = () => {
           const url = URL.createObjectURL(blob);
           if (!cancelled) {
             setConvertedOutput({ url, size: blob.size, ext: 'svg', width: outW, height: outH });
+          }
+        } else if (targetFormat === 'tiff') {
+          const blob = canvasToTiffBlob(canvas);
+          const url = URL.createObjectURL(blob);
+          if (!cancelled) {
+            setConvertedOutput({ url, size: blob.size, ext: 'tiff', width: outW, height: outH });
           }
         } else {
           const mime = `image/${targetFormat}`;
@@ -341,8 +402,8 @@ export const MediaConverter: React.FC = () => {
 
             <div>
               <label className="block text-xs text-slate-400 mb-1.5">Target Format</label>
-              <div className="grid grid-cols-4 gap-2">
-                {(['webp', 'png', 'jpeg', 'svg'] as TargetImageFormat[]).map((fmt) => (
+              <div className="grid grid-cols-5 gap-2">
+                {(['webp', 'png', 'jpeg', 'svg', 'tiff'] as TargetImageFormat[]).map((fmt) => (
                   <button
                     key={fmt}
                     type="button"
@@ -353,7 +414,7 @@ export const MediaConverter: React.FC = () => {
                         : 'bg-slate-950 text-slate-300 border-slate-800'
                     }`}
                   >
-                    .{fmt === 'jpeg' ? 'JPG' : fmt}
+                    .{fmt === 'jpeg' ? 'JPG' : fmt.toUpperCase()}
                   </button>
                 ))}
               </div>

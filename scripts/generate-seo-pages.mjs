@@ -96,6 +96,11 @@ const ROUTES = [
     description: 'Inspect JWT headers, claims, and expiration offline, test regular expressions with live capture groups, translate cron expressions, and batch-generate UUIDs.',
   },
   {
+    routePath: 'tools/ai-solutions',
+    title: 'Free AI Translation (130+ Languages), Text Summarizer, Audio Transcriber & AI Photo Editor | CommonTool',
+    description: 'Translate text across 130+ languages with speech pronunciation, summarize long documents into executive briefs, transcribe audio and speech recordings, and edit photos with browser GPU filters.',
+  },
+  {
     routePath: 'category/documents',
     title: 'Document & File Utilities — PDF Multi-Tool, Watermarks, Media Converter & OCR | CommonTool',
     description: 'Zero-upload browser utilities for merging, splitting, watermarking, signing, and converting PDFs, HEIC/WebP images, audio/video clips, and OCR text extraction.',

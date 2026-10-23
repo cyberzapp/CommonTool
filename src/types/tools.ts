@@ -23,7 +23,8 @@ export type ToolId =
   | 'pomodoro-timer'
   | 'scratchpad-checklist'
   | 'privacy-security'
-  | 'dev-diagnostics';
+  | 'dev-diagnostics'
+  | 'ai-solutions';
 
 export interface ToolFaq {
   question: string;
@@ -601,6 +602,49 @@ export const TOOLS_CATALOG: ToolMetadata[] = [
       },
     ],
     relatedTools: ['privacy-security', 'data-workbench', 'writing-aids'],
+  },
+  {
+    id: 'ai-solutions',
+    path: '/tools/ai-solutions',
+    title: 'AI Solutions & Creative Studio',
+    shortTitle: 'AI Solutions Suite',
+    seoTitle: 'Free AI Translation (130+ Languages), Text Summarizer, Audio Transcriber & AI Photo Editor | CommonTool',
+    seoDescription:
+      'Translate text across 130+ languages with speech pronunciation, summarize long documents into executive briefs, transcribe audio and speech recordings, and edit photos with browser GPU filters.',
+    keywords: [
+      'ai translation 130 languages',
+      'text summarizer online',
+      'audio transcription speech to text',
+      'browser ai photo editor',
+      'client side ai tools',
+      'privacy ai utilities',
+    ],
+    category: 'productivity',
+    categoryLabel: 'AI & Productivity',
+    description:
+      'AI-powered translation across 130+ languages, executive text summarization, audio speech transcription, and browser-based AI photo editing.',
+    badges: ['130+ Languages', 'Text Summarizer', 'Audio Transcriber', 'AI Photo Editor'],
+    accent: 'from-violet-500 to-indigo-500',
+    zeroUpload: true,
+    steps: [
+      'Select AI Translation to translate between 130+ languages with text-to-speech audio.',
+      'Use Text Summarizer to extract executive briefs, key bullet points, or TL;DR summaries with length sliders.',
+      'Speak into the microphone or upload an audio file to transcribe speech into text.',
+      'Open the AI Photo Editor to auto-enhance photos, adjust exposure, apply cinematic presets, and export high-res images.',
+    ],
+    faqs: [
+      {
+        question: 'Are my texts, documents, or photos sent to an external server?',
+        answer:
+          'No. All text summarization, live microphone speech recognition, and GPU photo editing run 100% locally inside your web browser.',
+      },
+      {
+        question: 'How many languages are supported in AI Translation?',
+        answer:
+          'Over 130 world languages are supported, with instant translation and native speech audio pronunciation.',
+      },
+    ],
+    relatedTools: ['writing-aids', 'ocr-scanner', 'media-converter'],
   },
 ];
 

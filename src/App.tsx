@@ -33,6 +33,7 @@ import { PomodoroTimer } from './components/tools/PomodoroTimer';
 import { ScratchpadChecklist } from './components/tools/ScratchpadChecklist';
 import { PrivacySecurity } from './components/tools/PrivacySecurity';
 import { DevDiagnostics } from './components/tools/DevDiagnostics';
+import { AiSolutions } from './components/tools/AiSolutions';
 
 import {
   ShieldCheck,
@@ -294,6 +295,8 @@ export function App() {
         return <PrivacySecurity />;
       case 'dev-diagnostics':
         return <DevDiagnostics />;
+      case 'ai-solutions':
+        return <AiSolutions />;
       default:
         return null;
     }
