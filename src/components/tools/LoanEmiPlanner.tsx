@@ -3,10 +3,12 @@ import {
   Landmark,
   Briefcase,
   Download,
+  Info,
 } from 'lucide-react';
 
 export const LoanEmiPlanner: React.FC = () => {
   const [mode, setMode] = useState<'emi' | 'freelance'>('emi');
+  const [showInfo, setShowInfo] = useState(false);
 
   // Loan / Mortgage EMI State
   const [loanAmount, setLoanAmount] = useState(250000);
@@ -77,34 +79,44 @@ export const LoanEmiPlanner: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <Landmark className="w-6 h-6 text-teal-400" />
-            Loan EMI Amortization & Consulting Rate Planner
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Landmark className="w-5 h-5 text-teal-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Loan EMI & Consulting Rate Planner</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setMode('emi')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                mode === 'emi' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              Loan & Mortgage EMI
+            </button>
+            <button
+              onClick={() => setMode('freelance')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
+                mode === 'freelance' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
+              }`}
+            >
+              Freelance Hourly Rate
+            </button>
+          </div>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
             Calculate mortgage/business loan EMIs with yearly amortization schedules or determine your freelance billable rate.
           </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode('emi')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
-              mode === 'emi' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            Loan & Mortgage EMI
-          </button>
-          <button
-            onClick={() => setMode('freelance')}
-            className={`px-4 py-2 rounded-xl text-xs font-semibold cursor-pointer ${
-              mode === 'freelance' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-300'
-            }`}
-          >
-            Freelance Hourly Rate
-          </button>
-        </div>
+        )}
       </div>
 
       {mode === 'emi' ? (

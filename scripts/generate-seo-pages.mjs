@@ -116,6 +116,11 @@ const ROUTES = [
     description: 'Stay focused with a WebAudio Pomodoro timer, auto-saving local scratchpad, cryptographic password generator, JWT inspector, Regex tester, and Cron explainer.',
   },
   {
+    routePath: 'how-to-use',
+    title: 'How to Use CommonTool — Step-by-Step Guides for All 18 Utilities',
+    description: 'Step-by-step instructions, tips, and answers for using all 18 client-side PDF, media, OCR, invoice, financial, academic, and developer utilities.',
+  },
+  {
     routePath: 'donate',
     title: 'Support CommonTool — Keep Free, Private Web Utilities Alive | Donate via Razorpay',
     description: 'Support CommonTool with a heartfelt contribution via Razorpay. Help us keep all 18+ client-side tools 100% free, ad-free, and build our upcoming iOS and Android apps.',

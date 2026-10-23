@@ -7,12 +7,14 @@ import {
   Volume2,
   VolumeX,
   CheckCircle2,
+  Info,
 } from 'lucide-react';
 
 type TimerPhase = 'focus' | 'short-break' | 'long-break';
 type AmbientPreset = 'off' | 'pink-rain' | 'brown-deep' | 'binaural-drone';
 
 export const PomodoroTimer: React.FC = () => {
+  const [showInfo, setShowInfo] = useState(false);
   const [focusMins, setFocusMins] = useState(25);
   const [shortBreakMins, setShortBreakMins] = useState(5);
   const [longBreakMins, setLongBreakMins] = useState(15);
@@ -175,20 +177,30 @@ export const PomodoroTimer: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <Timer className="w-6 h-6 text-orange-400" />
-            Pomodoro & Ambient Focus Timer
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Timer className="w-5 h-5 text-orange-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Pomodoro & Ambient Focus Timer</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-xs font-bold">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            Sessions: {completedSessions}
+          </div>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
             Configurable interval timer with Web Audio API synthesized ambient soundscapes — 100% offline capable.
           </p>
-        </div>
-        <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-orange-500/15 border border-orange-500/30 text-orange-300 text-xs font-bold">
-          <CheckCircle2 className="w-4 h-4" />
-          Completed Focus Sessions: {completedSessions}
-        </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

@@ -34,8 +34,15 @@ html.light {
   color-scheme: light;
 }
 
+html,
 body {
   margin: 0;
+  padding: 0;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
   min-block-size: 100dvb;
   background-color: var(--bg-app);
   color: var(--text-primary);

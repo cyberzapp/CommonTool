@@ -30,8 +30,10 @@ import {
   type DonationRecord,
 } from '../lib/razorpay';
 import { logSupportTicketToFirestore } from '../lib/firebase';
+import { TOOLS_CATALOG, type ToolId } from '../types/tools';
 
 export type StaticPageId =
+  | 'how-to-use'
   | 'donate'
   | 'about'
   | 'security'
@@ -44,6 +46,13 @@ export const STATIC_PAGES_META: Record<
   StaticPageId,
   { path: string; label: string; seoTitle: string; seoDescription: string }
 > = {
+  'how-to-use': {
+    path: '/how-to-use',
+    label: 'How to Use',
+    seoTitle: 'How to Use CommonTool — Step-by-Step Guides for All 18 Utilities',
+    seoDescription:
+      'Step-by-step instructions, tips, and answers for using all 18 client-side PDF, media, OCR, invoice, financial, academic, and developer utilities.',
+  },
   donate: {
     path: '/donate',
     label: 'Donate ❤️',
@@ -99,6 +108,8 @@ interface InfoPagesProps {
   pageId: StaticPageId;
   isDark: boolean;
   onNavigatePage: (page: StaticPageId, e?: React.MouseEvent) => void;
+  onNavigateTool?: (id: ToolId, e?: React.MouseEvent) => void;
+  initialGuideToolId?: ToolId | null;
 }
 
 const DONATION_TIERS = [
@@ -137,8 +148,17 @@ const DONATION_TIERS = [
   },
 ];
 
-export const InfoPages: React.FC<InfoPagesProps> = ({ pageId, isDark, onNavigatePage }) => {
+export const InfoPages: React.FC<InfoPagesProps> = ({
+  pageId,
+  isDark,
+  onNavigatePage,
+  onNavigateTool,
+  initialGuideToolId,
+}) => {
   const [faqQuery, setFaqQuery] = useState('');
+  const [selectedGuideToolId, setSelectedGuideToolId] = useState<ToolId>(
+    initialGuideToolId || 'pdf-multitool'
+  );
 
   // Support Form State
   const [supportName, setSupportName] = useState('');
@@ -302,6 +322,103 @@ export const InfoPages: React.FC<InfoPagesProps> = ({ pageId, isDark, onNavigate
           );
         })}
       </div>
+
+      {/* 0A. HOW TO USE GUIDES PAGE */}
+      {pageId === 'how-to-use' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className={'lg:col-span-4 ' + cardClass + ' space-y-3'}>
+            <h1 className={`text-base font-bold ${headingText}`}>Select a Tool Guide</h1>
+            <p className={`text-xs ${mutedText}`}>
+              Choose any of the 18 utilities below to view its step-by-step instructions and FAQs.
+            </p>
+            <div className="space-y-1 max-h-[460px] overflow-y-auto pr-1">
+              {TOOLS_CATALOG.map((t) => {
+                const active = selectedGuideToolId === t.id;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setSelectedGuideToolId(t.id)}
+                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer flex items-center justify-between ${
+                      active
+                        ? 'bg-indigo-600 text-white'
+                        : isDark
+                        ? 'text-zinc-300 hover:bg-zinc-900'
+                        : 'text-slate-700 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="truncate">{t.shortTitle}</span>
+                    <span className={`text-[10px] ${active ? 'text-white/80' : mutedText}`}>
+                      {t.category}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className={'lg:col-span-8 ' + cardClass + ' space-y-6'}>
+            {(() => {
+              const guideTool =
+                TOOLS_CATALOG.find((t) => t.id === selectedGuideToolId) || TOOLS_CATALOG[0];
+              return (
+                <>
+                  <div className="flex flex-wrap items-start justify-between gap-4 pb-4 border-b border-slate-200 dark:border-zinc-800">
+                    <div className="space-y-1 max-w-xl">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-500">
+                        {guideTool.categoryLabel}
+                      </span>
+                      <h2 className={`text-xl font-bold ${headingText}`}>{guideTool.title}</h2>
+                      <p className={`text-xs leading-relaxed ${mutedText}`}>
+                        {guideTool.description}
+                      </p>
+                    </div>
+                    {onNavigateTool && (
+                      <a
+                        href={guideTool.path}
+                        onClick={(e) => onNavigateTool(guideTool.id, e)}
+                        className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition shrink-0"
+                      >
+                        Open Tool →
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className={`text-sm font-bold ${headingText}`}>
+                      Step-by-Step Instructions
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {guideTool.steps.map((step, i) => (
+                        <div key={i} className={subCardClass + ' space-y-1.5'}>
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-indigo-600 text-white text-xs font-bold">
+                            {i + 1}
+                          </span>
+                          <p className={`text-xs leading-relaxed ${mutedText}`}>{step}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <h3 className={`text-sm font-bold ${headingText}`}>
+                      Common Questions ({guideTool.shortTitle})
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {guideTool.faqs.map((f, i) => (
+                        <div key={i} className={subCardClass + ' space-y-1'}>
+                          <p className={`text-xs font-bold ${headingText}`}>{f.question}</p>
+                          <p className={`text-xs leading-relaxed ${mutedText}`}>{f.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* 0. HEARTFELT DONATE PAGE (RAZORPAY INTEGRATED) */}
       {pageId === 'donate' && (

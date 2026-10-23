@@ -6,6 +6,7 @@ import {
   Copy,
   CheckCircle2,
   FileText,
+  Info,
 } from 'lucide-react';
 
 type TemplateType = 'nda' | 'service-agreement' | 'quotation' | 'offer-letter';
@@ -20,6 +21,7 @@ export const BusinessTemplates: React.FC = () => {
   const [compensationOrFee, setCompensationOrFee] = useState('$165,000 USD Base Salary + Equity');
   const [durationOrValidity, setDurationOrValidity] = useState('3 Years Confidentiality Term');
   const [copied, setCopied] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   const selectPreset = (type: TemplateType) => {
     setTemplateType(type);
@@ -199,32 +201,42 @@ ${partyB}`,
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <FileSignature className="w-6 h-6 text-blue-400" />
-            Business Document Templates
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Instant NDAs, Master Service Agreements, Quotation Sheets, and Employment Offer Letters with PDF & Word export.
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <FileSignature className="w-5 h-5 text-blue-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Business Document Templates</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={exportWord}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+            >
+              <FileText className="w-3.5 h-3.5 text-blue-400" />
+              Export .DOC
+            </button>
+            <button
+              onClick={exportPdf}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export PDF
+            </button>
+          </div>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
+            Instant NDAs, Master Service Agreements, Quotation Sheets, and Employment Offer Letters with live contract preview and PDF/Word export.
           </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={exportWord}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
-          >
-            <FileText className="w-4 h-4 text-blue-400" />
-            Export Word (.DOC)
-          </button>
-          <button
-            onClick={exportPdf}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 hover:bg-blue-400 text-white text-xs font-bold cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            Export PDF
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Template Selector */}

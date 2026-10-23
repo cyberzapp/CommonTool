@@ -8,6 +8,7 @@ import {
   Save,
   FolderOpen,
   CheckCircle2,
+  Info,
 } from 'lucide-react';
 
 interface LineItem {
@@ -70,6 +71,7 @@ export const InvoiceGenerator: React.FC = () => {
   const [notes, setNotes] = useState('Payment accepted via ACH, Wire Transfer, or Stripe. Thank you for your business!');
   const [savedInvoices, setSavedInvoices] = useState<SavedInvoice[]>([]);
   const [banner, setBanner] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     const loadSaved = () => {
@@ -281,32 +283,42 @@ export const InvoiceGenerator: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <Receipt className="w-6 h-6 text-indigo-400" />
-            Invoice & Receipt Generator
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Create clean, unbranded client invoices and payment receipts with custom currencies, taxes, and instant PDF export.
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Receipt className="w-5 h-5 text-indigo-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Invoice & Receipt Generator</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={saveInvoiceTemplate}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5 text-indigo-400" />
+              Save Template
+            </button>
+            <button
+              onClick={exportUnbrandedPdf}
+              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export Unbranded PDF
+            </button>
+          </div>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
+            Create clean, unbranded client invoices and payment receipts with custom currencies, taxes, live A4 paper preview, and instant PDF export.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={saveInvoiceTemplate}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5 text-indigo-400" />
-            Save Template
-          </button>
-          <button
-            onClick={exportUnbrandedPdf}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 text-white font-semibold text-sm shadow-lg shadow-indigo-500/20 cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            Export Unbranded PDF
-          </button>
-        </div>
+        )}
       </div>
 
       {banner && (

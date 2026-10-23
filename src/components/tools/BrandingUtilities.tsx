@@ -9,12 +9,14 @@ import {
   Copy,
   CheckCircle2,
   Upload,
+  Info,
 } from 'lucide-react';
 
 type BrandTab = 'qr' | 'palette' | 'cropper';
 
 export const BrandingUtilities: React.FC = () => {
   const [activeTab, setActiveTab] = useState<BrandTab>('qr');
+  const [showInfo, setShowInfo] = useState(false);
 
   // 1. QR Code Generator State
   const [qrText, setQrText] = useState('https://commontool.app');
@@ -203,16 +205,24 @@ export const BrandingUtilities: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <QrCode className="w-6 h-6 text-fuchsia-400" />
-            Branding & Social Media Studio
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            SVG/PNG QR code builder with custom colors & center logo, color palette generator, and social aspect-ratio cropper.
-          </p>
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex items-center gap-2.5">
+          <QrCode className="w-5 h-5 text-fuchsia-400 shrink-0" />
+          <h2 className="text-lg font-bold text-white">Branding & Social Media Studio</h2>
+          <button
+            onClick={() => setShowInfo((v) => !v)}
+            aria-label="Toggle tool info"
+            className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            title="About this tool"
+          >
+            <Info className="w-4 h-4" />
+          </button>
         </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
+            SVG/PNG QR code builder with custom colors & center logo, color palette generator, and social aspect-ratio cropper with live preview.
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">

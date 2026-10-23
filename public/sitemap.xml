@@ -119,6 +119,11 @@
   </url>
   <!-- Company, Trust & Support Pages -->
   <url>
+    <loc>https://commontool.web.app/how-to-use</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
     <loc>https://commontool.web.app/donate</loc>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>

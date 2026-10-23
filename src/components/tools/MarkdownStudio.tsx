@@ -10,6 +10,7 @@ import {
   List,
   Code,
   Heading2,
+  Info,
 } from 'lucide-react';
 
 const DEFAULT_MD = `# CommonTool Research & Note Studio
@@ -36,6 +37,7 @@ export function verifyPrivacy(payload: Uint8Array): boolean {
 
 export const MarkdownStudio: React.FC = () => {
   const [markdown, setMarkdown] = useState(DEFAULT_MD);
+  const [showInfo, setShowInfo] = useState(false);
 
   const renderedHtml = marked.parse(markdown, { async: false }) as string;
 
@@ -112,32 +114,42 @@ ${renderedHtml}
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <FileCode2 className="w-6 h-6 text-purple-400" />
-            Markdown Previewer & Document Studio
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <FileCode2 className="w-5 h-5 text-purple-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Markdown Previewer & Document Studio</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={exportStandaloneHtml}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+            >
+              <FileCode2 className="w-3.5 h-3.5 text-purple-400" />
+              Export HTML
+            </button>
+            <button
+              onClick={exportMarkdownPdf}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-white text-xs font-bold cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export PDF
+            </button>
+          </div>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
             Write GitHub-Flavored Markdown with live split-pane preview and one-click HTML or PDF export.
           </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={exportStandaloneHtml}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
-          >
-            <FileCode2 className="w-4 h-4 text-purple-400" />
-            Export HTML
-          </button>
-          <button
-            onClick={exportMarkdownPdf}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-purple-500 hover:bg-purple-400 text-white text-xs font-bold cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            Export PDF
-          </button>
-        </div>
+        )}
       </div>
 
       {/* Formatting Toolbar */}

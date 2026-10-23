@@ -4,8 +4,8 @@ import {
   CheckSquare,
   Plus,
   Trash2,
-  CheckCircle2,
   Sparkles,
+  Info,
 } from 'lucide-react';
 
 interface ScratchNote {
@@ -26,6 +26,7 @@ const NOTES_KEY = 'commontool_scratchpad_notes';
 const TASKS_KEY = 'commontool_checklist_items';
 
 export const ScratchpadChecklist: React.FC = () => {
+  const [showInfo, setShowInfo] = useState(false);
   const [notes, setNotes] = useState<ScratchNote[]>(() => {
     try {
       const saved = localStorage.getItem(NOTES_KEY);
@@ -127,20 +128,30 @@ export const ScratchpadChecklist: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <NotebookPen className="w-6 h-6 text-lime-400" />
-            Quick Scratchpad & Priority Checklist
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <NotebookPen className="w-5 h-5 text-lime-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Quick Scratchpad & Priority Checklist</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-lime-500/15 border border-lime-500/30 text-lime-300 text-xs font-semibold">
+            <Sparkles className="w-3.5 h-3.5" />
+            Auto-Saved ({activeNote?.updatedAt || 'Now'})
+          </span>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
             Instant client-side LocalStorage persistence without requiring an account — auto-saved on every keystroke.
           </p>
-        </div>
-        <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-lime-500/15 border border-lime-500/30 text-lime-300 text-xs font-semibold">
-          <Sparkles className="w-3.5 h-3.5" />
-          Auto-Saved Locally ({activeNote?.updatedAt || 'Now'})
-        </span>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

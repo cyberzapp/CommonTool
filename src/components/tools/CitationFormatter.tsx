@@ -6,6 +6,7 @@ import {
   Trash2,
   CheckCircle2,
   Download,
+  Info,
 } from 'lucide-react';
 
 type CitationStyle = 'APA' | 'MLA' | 'IEEE' | 'Chicago';
@@ -34,6 +35,7 @@ export const CitationFormatter: React.FC = () => {
   const [doiOrUrl, setDoiOrUrl] = useState('https://doi.org/10.1145/3589123.2026');
   const [savedList, setSavedList] = useState<SavedReference[]>([]);
   const [copied, setCopied] = useState(false);
+  const [showInfo, setShowInfo] = useState(false);
 
   useEffect(() => {
     try {
@@ -100,31 +102,41 @@ export const CitationFormatter: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <BookOpen className="w-6 h-6 text-violet-400" />
-            Citation & Bibliography Formatter
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Generate accurate academic citations and in-text references in APA 7th, MLA 9th, IEEE, and Chicago 17th styles.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {(['APA', 'MLA', 'IEEE', 'Chicago'] as CitationStyle[]).map((st) => (
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <BookOpen className="w-5 h-5 text-violet-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">Citation & Bibliography Formatter</h2>
             <button
-              key={st}
-              onClick={() => setStyle(st)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
-                style === st
-                  ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
-                  : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
-              }`}
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool info"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
             >
-              {st} Style
+              <Info className="w-4 h-4" />
             </button>
-          ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {(['APA', 'MLA', 'IEEE', 'Chicago'] as CitationStyle[]).map((st) => (
+              <button
+                key={st}
+                onClick={() => setStyle(st)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  style === st
+                    ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/20'
+                    : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
         </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
+            Generate accurate academic citations and in-text references in APA 7th, MLA 9th, IEEE, and Chicago 17th styles with live bibliography preview.
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">

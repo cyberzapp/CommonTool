@@ -1,17 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Tesseract from 'tesseract.js';
 import {
   ScanText,
   Upload,
-  Sparkles,
   Copy,
   Download,
   CheckCircle2,
   Sliders,
+  Info,
+  Eye,
+  RefreshCw,
 } from 'lucide-react';
 
 export const OcrScanner: React.FC = () => {
+  const [showInfo, setShowInfo] = useState(false);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [processedPreviewUrl, setProcessedPreviewUrl] = useState<string | null>(null);
   const [highContrast, setHighContrast] = useState(true);
   const [ocrText, setOcrText] = useState<string>('');
   const [progress, setProgress] = useState<number>(0);
@@ -20,48 +24,8 @@ export const OcrScanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Create a crisp synthetic receipt or scanned memo canvas and run OCR on it
-  const generateSampleDocument = (kind: 'receipt' | 'memo') => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 760;
-    canvas.height = 460;
-    const ctx = canvas.getContext('2d')!;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.fillStyle = '#0f172a';
-    if (kind === 'receipt') {
-      ctx.font = 'bold 28px monospace';
-      ctx.fillText('COMMONTOOL COFFEE ROASTERS', 50, 65);
-      ctx.font = '20px monospace';
-      ctx.fillText('Order #4092  -  Date: 2026-10-23', 50, 110);
-      ctx.fillText('--------------------------------------', 50, 145);
-      ctx.fillText('1x Double Espresso           $4.50', 50, 185);
-      ctx.fillText('2x Artisanal Croissant       $9.00', 50, 225);
-      ctx.fillText('1x Oat Milk Latte            $5.75', 50, 265);
-      ctx.fillText('--------------------------------------', 50, 305);
-      ctx.font = 'bold 24px monospace';
-      ctx.fillText('TOTAL PAID:                 $19.25', 50, 350);
-      ctx.font = '18px monospace';
-      ctx.fillText('Thank you for choosing zero-upload OCR!', 50, 405);
-    } else {
-      ctx.font = 'bold 28px Arial, sans-serif';
-      ctx.fillText('RESEARCH FIELD NOTE #18', 50, 70);
-      ctx.font = '22px Arial, sans-serif';
-      ctx.fillText('Subject: Client-Side WebAssembly Performance', 50, 125);
-      ctx.fillText('Observation 1: Zero server latency on document scans.', 50, 185);
-      ctx.fillText('Observation 2: Full user privacy for sensitive records.', 50, 235);
-      ctx.fillText('Action Item: Export extracted text directly to Markdown.', 50, 285);
-      ctx.fillText('Signed: Dr. Elena Vance, Lead Architect', 50, 355);
-    }
-
-    const url = canvas.toDataURL('image/png');
-    setImageUrl(url);
-    runOcrOnDataUrl(url);
-  };
-
-  const preprocessImage = async (srcUrl: string): Promise<string> => {
-    if (!highContrast) return srcUrl;
+  const preprocessImage = async (srcUrl: string, useContrast: boolean): Promise<string> => {
+    if (!useContrast) return srcUrl;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     await new Promise<void>((res, rej) => {
@@ -85,12 +49,32 @@ export const OcrScanner: React.FC = () => {
     return canvas.toDataURL('image/png');
   };
 
-  const runOcrOnDataUrl = async (targetUrl: string) => {
+  // Live visual preview of image preprocessing whenever image or contrast toggle changes
+  useEffect(() => {
+    if (!imageUrl) {
+      setProcessedPreviewUrl(null);
+      return;
+    }
+    let cancelled = false;
+    preprocessImage(imageUrl, highContrast)
+      .then((res) => {
+        if (!cancelled) setProcessedPreviewUrl(res);
+      })
+      .catch(() => {
+        if (!cancelled) setProcessedPreviewUrl(imageUrl);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [imageUrl, highContrast]);
+
+  const runOcrOnDataUrl = async (targetUrl: string, useContrast = highContrast) => {
     setIsScanning(true);
     setProgress(5);
     setStatusLabel('Initializing Tesseract WebAssembly OCR...');
     try {
-      const processedUrl = await preprocessImage(targetUrl);
+      const processedUrl = await preprocessImage(targetUrl, useContrast);
+      setProcessedPreviewUrl(processedUrl);
       const result = await Tesseract.recognize(processedUrl, 'eng', {
         logger: (m) => {
           if (m.status) setStatusLabel(m.status);
@@ -116,7 +100,7 @@ export const OcrScanner: React.FC = () => {
     reader.onload = () => {
       const dataUrl = reader.result as string;
       setImageUrl(dataUrl);
-      runOcrOnDataUrl(dataUrl);
+      runOcrOnDataUrl(dataUrl, highContrast);
     };
     reader.readAsDataURL(file);
   };
@@ -138,41 +122,46 @@ export const OcrScanner: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <ScanText className="w-6 h-6 text-emerald-400" />
-            OCR / Image-to-Text Scanner
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
-            Extract text from scanned documents, receipts, screenshots, and notes 100% locally via WebAssembly.
+    <div className="space-y-5">
+      {/* Compact Header with (i) Info Toggle */}
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <ScanText className="w-5 h-5 text-emerald-400 shrink-0" />
+            <h2 className="text-lg font-bold text-white">OCR / Image-to-Text Scanner</h2>
+            <button
+              onClick={() => setShowInfo((v) => !v)}
+              aria-label="Toggle tool information"
+              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              title="About this tool"
+            >
+              <Info className="w-4 h-4" />
+            </button>
+          </div>
+
+          <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer">
+            <Upload className="w-3.5 h-3.5" />
+            <span>Upload Image / Screenshot</span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => handleFileUpload(e.target.files?.[0])}
+            />
+          </label>
+        </div>
+
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
+            Extract text from scanned documents, receipts, screenshots, and notes 100% locally via Tesseract WebAssembly. Preview image binarization and edit extracted text before downloading.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => generateSampleDocument('receipt')}
-            disabled={isScanning}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-semibold hover:bg-emerald-500/30 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4" />
-            Scan Sample Receipt
-          </button>
-          <button
-            onClick={() => generateSampleDocument('memo')}
-            disabled={isScanning}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-teal-500/20 border border-teal-500/40 text-teal-300 text-xs font-semibold hover:bg-teal-500/30 cursor-pointer"
-          >
-            <Sparkles className="w-4 h-4" />
-            Scan Sample Field Note
-          </button>
-        </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Image Source & Controls */}
+        {/* Left: Live Image Preprocessing Preview & Controls */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 space-y-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <label className="inline-flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
               <input
                 type="checkbox"
@@ -180,11 +169,42 @@ export const OcrScanner: React.FC = () => {
                 onChange={(e) => setHighContrast(e.target.checked)}
               />
               <Sliders className="w-3.5 h-3.5 text-emerald-400" />
-              Auto Contrast & Adaptive Binarization
+              High-Contrast Adaptive Binarization
             </label>
-            <label className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer">
-              <Upload className="w-3.5 h-3.5" />
-              <span>Upload Image / Screenshot</span>
+
+            {imageUrl && (
+              <button
+                onClick={() => runOcrOnDataUrl(imageUrl, highContrast)}
+                disabled={isScanning}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-semibold text-emerald-300 cursor-pointer"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isScanning ? 'animate-spin' : ''}`} />
+                Re-Scan with Current Filter
+              </button>
+            )}
+          </div>
+
+          {processedPreviewUrl ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-[11px] text-slate-400">
+                <span className="inline-flex items-center gap-1 font-semibold text-emerald-400">
+                  <Eye className="w-3.5 h-3.5" />
+                  Live Preprocessed Scanner Preview ({highContrast ? 'High-Contrast Binarized' : 'Original Color'})
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <img
+                  src={processedPreviewUrl}
+                  alt="Live Preprocessed OCR Preview"
+                  className="max-h-72 mx-auto rounded object-contain"
+                />
+              </div>
+            </div>
+          ) : (
+            <label className="block border-2 border-dashed border-slate-800 hover:border-emerald-500/40 rounded-xl p-12 text-center space-y-2 cursor-pointer transition">
+              <ScanText className="w-10 h-10 text-slate-500 mx-auto" />
+              <p className="text-sm text-slate-300 font-medium">Click to upload an image, receipt, or screenshot</p>
+              <p className="text-xs text-slate-500">Supports PNG, JPG, WEBP — processed locally in your browser</p>
               <input
                 type="file"
                 accept="image/*"
@@ -192,17 +212,6 @@ export const OcrScanner: React.FC = () => {
                 onChange={(e) => handleFileUpload(e.target.files?.[0])}
               />
             </label>
-          </div>
-
-          {imageUrl ? (
-            <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-              <img src={imageUrl} alt="OCR Document" className="max-h-64 mx-auto rounded object-contain" />
-            </div>
-          ) : (
-            <div className="border-2 border-dashed border-slate-800 rounded-xl p-12 text-center space-y-2">
-              <ScanText className="w-10 h-10 text-slate-500 mx-auto" />
-              <p className="text-sm text-slate-300 font-medium">Drop or upload an image, or click "Scan Sample Receipt"</p>
-            </div>
           )}
 
           {/* Progress Bar */}
@@ -222,11 +231,11 @@ export const OcrScanner: React.FC = () => {
           )}
         </div>
 
-        {/* Right: Extracted Text Output */}
+        {/* Right: Live Editable Extracted Text Output Preview before Download */}
         <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-white">Extracted Text</h3>
+              <h3 className="text-sm font-semibold text-white">Live Extracted Text Preview (Editable)</h3>
               {confidence !== null && (
                 <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
                   {confidence}% Confidence
@@ -245,19 +254,19 @@ export const OcrScanner: React.FC = () => {
               <button
                 onClick={downloadTxt}
                 disabled={!ocrText}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-xs font-bold text-slate-950 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-xs font-bold text-slate-950 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                Export .TXT
+                Download .TXT
               </button>
             </div>
           </div>
 
           <textarea
-            rows={10}
+            rows={11}
             value={ocrText}
             onChange={(e) => setOcrText(e.target.value)}
-            placeholder="Extracted text will appear here automatically..."
+            placeholder="Upload an image on the left to preview and edit extracted text before downloading..."
             className="w-full flex-1 rounded-xl bg-slate-950 border border-slate-800 p-4 text-sm text-slate-100 font-mono-code"
           />
         </div>

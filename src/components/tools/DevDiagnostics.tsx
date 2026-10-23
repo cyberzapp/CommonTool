@@ -8,6 +8,7 @@ import {
   Copy,
   RefreshCw,
   CheckCircle2,
+  Info,
 } from 'lucide-react';
 
 type DevTab = 'jwt' | 'regex' | 'cron' | 'uuid';
@@ -17,6 +18,7 @@ const SAMPLE_JWT =
 
 export const DevDiagnostics: React.FC = () => {
   const [activeTab, setActiveTab] = useState<DevTab>('jwt');
+  const [showInfo, setShowInfo] = useState(false);
 
   // 1. JWT Decoder
   const [jwtToken, setJwtToken] = useState(SAMPLE_JWT);
@@ -98,16 +100,24 @@ export const DevDiagnostics: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <Terminal className="w-6 h-6 text-indigo-400" />
-            Developer & Web Diagnostics Suite
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex items-center gap-2.5">
+          <Terminal className="w-5 h-5 text-indigo-400 shrink-0" />
+          <h2 className="text-lg font-bold text-white">Developer & Web Diagnostics Suite</h2>
+          <button
+            onClick={() => setShowInfo((v) => !v)}
+            aria-label="Toggle tool info"
+            className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            title="About this tool"
+          >
+            <Info className="w-4 h-4" />
+          </button>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
             Inspect JWT tokens offline, test Regular Expressions with capture groups, translate Cron schedules, and generate bulk UUIDs.
           </p>
-        </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">

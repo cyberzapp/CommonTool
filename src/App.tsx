@@ -8,7 +8,6 @@ import { auth, onAuthStateChanged, type User } from './lib/firebase';
 import { updatePageSeo } from './lib/seo';
 import { CloudSyncModal } from './components/CloudSyncModal';
 import { InteractiveLanding } from './components/InteractiveLanding';
-import { ToolSeoSection } from './components/ToolSeoSection';
 import {
   InfoPages,
   STATIC_PAGES_META,
@@ -56,6 +55,7 @@ import {
   Check,
   Heart,
   Mail,
+  BookOpen,
 } from 'lucide-react';
 
 interface BeforeInstallPromptEvent extends Event {
@@ -79,7 +79,6 @@ function parseLocationRoute(): {
     return { toolId: queryTool, categoryId: 'all', staticPageId: null, pathname: cleanPath };
   }
 
-  // Check static pages (/donate, /about, /security, /privacy-policy, /terms-and-conditions, /faq, /help-and-support)
   const trimmedSlug = rawPath.slice(1) as StaticPageId;
   if (trimmedSlug in STATIC_PAGES_META) {
     return {
@@ -113,6 +112,7 @@ export function App() {
   const [selectedCategory, setSelectedCategory] = useState<ToolCategoryId>(initialRoute.categoryId);
   const [activeToolId, setActiveToolId] = useState<ToolId | null>(initialRoute.toolId);
   const [activeStaticPage, setActiveStaticPage] = useState<StaticPageId | null>(initialRoute.staticPageId);
+  const [guideToolId, setGuideToolId] = useState<ToolId | null>(initialRoute.toolId);
   const [currentPathname, setCurrentPathname] = useState<string>(initialRoute.pathname);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,6 +188,7 @@ export function App() {
     setActiveStaticPage(null);
     setActiveToolId(id);
     if (id) {
+      setGuideToolId(id);
       const found = TOOLS_CATALOG.find((t) => t.id === id);
       if (found) setSelectedCategory(found.category);
     }
@@ -211,19 +212,27 @@ export function App() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
-  const navigateToStaticPage = useCallback((page: StaticPageId, e?: React.MouseEvent) => {
-    if (e) {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-      e.preventDefault();
-    }
-    const targetPath = STATIC_PAGES_META[page].path;
-    window.history.pushState({}, '', targetPath);
-    setActiveToolId(null);
-    setActiveStaticPage(page);
-    setCurrentPathname(targetPath);
-    setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  const navigateToStaticPage = useCallback(
+    (page: StaticPageId, e?: React.MouseEvent, forToolId?: ToolId) => {
+      if (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+      }
+      if (forToolId) {
+        setGuideToolId(forToolId);
+      } else if (activeToolId) {
+        setGuideToolId(activeToolId);
+      }
+      const targetPath = STATIC_PAGES_META[page].path;
+      window.history.pushState({}, '', targetPath);
+      setActiveToolId(null);
+      setActiveStaticPage(page);
+      setCurrentPathname(targetPath);
+      setMobileMenuOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    [activeToolId]
+  );
 
   const handleInstallPwaClick = async () => {
     if (deferredPrompt) {
@@ -309,25 +318,25 @@ export function App() {
 
   return (
     <div
-      className={`min-h-screen flex flex-col pb-20 lg:pb-8 transition-colors duration-150 ${
+      className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden flex flex-col pb-20 lg:pb-8 transition-colors duration-150 ${
         isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-[#f8fafc] text-slate-900'
       }`}
     >
-      {/* Sticky Top Navbar */}
+      {/* Sticky Top Navbar — Strictly fits mobile width without horizontal expansion */}
       <header
-        className={`sticky top-0 z-30 backdrop-blur-md border-b px-3.5 sm:px-6 lg:px-8 py-2.5 sm:py-3 transition-colors ${
+        className={`sticky top-0 z-30 w-full backdrop-blur-md border-b px-3 sm:px-6 lg:px-8 py-2.5 transition-colors ${
           isDark
             ? 'bg-[#09090b]/90 border-zinc-800/80'
             : 'bg-white/90 border-slate-200/90'
         }`}
       >
-        <div className="max-w-7xl mx-auto flex flex-col gap-2.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
+        <div className="max-w-7xl mx-auto flex flex-col gap-2">
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
               <button
                 onClick={() => setMobileMenuOpen(true)}
                 aria-label="Open all tools menu"
-                className={`lg:hidden p-2 rounded-lg border transition cursor-pointer ${
+                className={`lg:hidden p-2 rounded-lg border transition cursor-pointer shrink-0 ${
                   isDark
                     ? 'bg-zinc-900 border-zinc-800 text-zinc-200'
                     : 'bg-slate-50 border-slate-200 text-slate-700'
@@ -339,22 +348,24 @@ export function App() {
               <a
                 href="/"
                 onClick={(e) => navigateToCategory('all', e)}
-                className="flex items-center gap-2.5 cursor-pointer group"
+                className="flex items-center gap-2 cursor-pointer group min-w-0"
               >
-                <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-                  <Wrench className="w-4 h-4" />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                  <Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
-                <span className="text-base font-bold tracking-tight">CommonTool</span>
+                <span className="text-sm sm:text-base font-bold tracking-tight truncate">
+                  CommonTool
+                </span>
               </a>
 
               {/* Top Nav Links for Desktop */}
-              <nav className="hidden xl:flex items-center gap-1 ml-4">
-                {(['about', 'security', 'faq', 'help-and-support'] as StaticPageId[]).map((pid) => (
+              <nav className="hidden xl:flex items-center gap-1 ml-3">
+                {(['how-to-use', 'about', 'security', 'faq', 'help-and-support'] as StaticPageId[]).map((pid) => (
                   <a
                     key={pid}
                     href={STATIC_PAGES_META[pid].path}
                     onClick={(e) => navigateToStaticPage(pid, e)}
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition ${
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition whitespace-nowrap ${
                       activeStaticPage === pid
                         ? 'bg-indigo-600 text-white'
                         : isDark
@@ -368,9 +379,9 @@ export function App() {
               </nav>
             </div>
 
-            {/* Right Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="hidden md:block relative w-56 lg:w-64">
+            {/* Right Controls — Compact icon-only on mobile to prevent horizontal overflow */}
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <div className="hidden md:block relative w-48 lg:w-60">
                 <Search
                   className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${
                     isDark ? 'text-zinc-500' : 'text-slate-400'
@@ -383,7 +394,7 @@ export function App() {
                     setSearchQuery(e.target.value);
                     if (activeToolId || activeStaticPage) navigateToCategory('all');
                   }}
-                  placeholder="Search 18 tools (PDF, OCR, EMI...)"
+                  placeholder="Search 18 tools..."
                   className={`w-full pl-8 pr-3 py-1.5 rounded-lg border text-xs transition ${
                     isDark
                       ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100 placeholder:text-zinc-500'
@@ -393,32 +404,46 @@ export function App() {
               </div>
 
               <a
+                href="/how-to-use"
+                onClick={(e) => navigateToStaticPage('how-to-use', e)}
+                title="How to Use Guides"
+                className={`hidden sm:inline-flex xl:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
+                  isDark
+                    ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
+                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+                <span>How to Use</span>
+              </a>
+
+              <a
                 href="/donate"
                 onClick={(e) => navigateToStaticPage('donate', e)}
                 title="Support CommonTool via Razorpay"
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition cursor-pointer shrink-0 shadow-xs"
+                className="inline-flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition cursor-pointer shrink-0 shadow-xs"
               >
                 <Heart className="w-3.5 h-3.5 fill-white" />
-                <span>Donate</span>
+                <span className="hidden sm:inline">Donate</span>
               </a>
 
               <button
                 onClick={handleInstallPwaClick}
                 title="Install CommonTool App"
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
+                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
                   isDark
                     ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
                 <Download className="w-3.5 h-3.5 text-indigo-500" />
-                <span className="hidden sm:inline">Install App</span>
+                <span className="hidden md:inline">Install App</span>
               </button>
 
               <button
                 onClick={toggleTheme}
                 aria-label="Toggle Light or Dark theme"
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
+                className={`inline-flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
                   isDark
                     ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
@@ -439,7 +464,8 @@ export function App() {
 
               <button
                 onClick={() => setCloudModalOpen(true)}
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
+                aria-label="Cloud Sync"
+                className={`inline-flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
                   isDark
                     ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
@@ -451,8 +477,8 @@ export function App() {
             </div>
           </div>
 
-          {/* Mobile Search Bar & Horizontal Category Links */}
-          <div className="flex flex-col gap-2 md:hidden">
+          {/* Mobile Search Bar Only (Category switching is handled cleanly by the bottom navigation bar) */}
+          <div className="md:hidden">
             <div className="relative w-full">
               <Search
                 className={`w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 ${
@@ -482,38 +508,14 @@ export function App() {
                 </button>
               )}
             </div>
-
-            {!activeToolId && !activeStaticPage && (
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                {CATEGORIES.map((cat) => {
-                  const active = selectedCategory === cat.id;
-                  return (
-                    <a
-                      key={cat.id}
-                      href={cat.path}
-                      onClick={(e) => navigateToCategory(cat.id, e)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition shrink-0 ${
-                        active
-                          ? 'bg-indigo-600 text-white'
-                          : isDark
-                          ? 'bg-zinc-900 text-zinc-400 border border-zinc-800'
-                          : 'bg-white text-slate-600 border border-slate-200'
-                      }`}
-                    >
-                      {cat.label} ({cat.count})
-                    </a>
-                  );
-                })}
-              </div>
-            )}
           </div>
         </div>
       </header>
 
       {/* Main Content Layout */}
-      <div className="max-w-7xl w-full mx-auto flex-1 px-3.5 sm:px-6 lg:px-8 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <div className="max-w-7xl w-full mx-auto flex-1 px-3 sm:px-6 lg:px-8 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 min-w-0">
         {/* Desktop Left Sidebar */}
-        <aside className="hidden lg:block lg:col-span-3 space-y-6">
+        <aside className="hidden lg:block lg:col-span-3 space-y-5 min-w-0">
           <div className="space-y-1">
             <p
               className={`px-2.5 pb-1.5 text-[11px] font-bold uppercase tracking-wider ${
@@ -591,7 +593,7 @@ export function App() {
           </div>
 
           <div
-            className={`rounded-xl border p-4 space-y-2.5 ${
+            className={`rounded-xl border p-4 space-y-2 ${
               isDark
                 ? 'bg-[#121215] border-zinc-800/90 text-zinc-400'
                 : 'bg-white border-slate-200/90 text-slate-600 shadow-xs'
@@ -606,45 +608,17 @@ export function App() {
               100% On-Device Privacy
             </div>
             <p className="text-[11px] leading-relaxed">
-              Every file is processed locally in your browser via WebAssembly & HTML5 Canvas. Nothing is uploaded.
+              Every file is processed locally in your browser. Nothing is uploaded.
             </p>
             <div className="pt-2 border-t border-slate-200 dark:border-zinc-800 flex items-center gap-1.5 text-[11px] font-semibold text-indigo-500">
               <Smartphone className="w-3.5 h-3.5 shrink-0" />
               <span>Coming Soon: iOS & Android Apps</span>
             </div>
           </div>
-
-          <div
-            className={`rounded-xl border p-4 space-y-2.5 ${
-              isDark
-                ? 'bg-[#121215] border-zinc-800/90 text-zinc-400'
-                : 'bg-white border-slate-200/90 text-slate-600 shadow-xs'
-            }`}
-          >
-            <div
-              className={`flex items-center gap-1.5 text-xs font-bold ${
-                isDark ? 'text-zinc-200' : 'text-slate-900'
-              }`}
-            >
-              <Heart className="w-4 h-4 text-rose-500 fill-rose-500" />
-              Support Free Software
-            </div>
-            <p className="text-[11px] leading-relaxed">
-              Help us maintain all 18 utilities free without ads or paywalls.
-            </p>
-            <a
-              href="/donate"
-              onClick={(e) => navigateToStaticPage('donate', e)}
-              className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition"
-            >
-              <Heart className="w-3.5 h-3.5 fill-white" />
-              Donate via Razorpay
-            </a>
-          </div>
         </aside>
 
         {/* Main Content Area */}
-        <main className="lg:col-span-9 space-y-6">
+        <main className="lg:col-span-9 space-y-6 min-w-0">
           {activeStaticPage ? (
             <div className="space-y-4">
               <a
@@ -663,16 +637,19 @@ export function App() {
                 pageId={activeStaticPage}
                 isDark={isDark}
                 onNavigatePage={navigateToStaticPage}
+                onNavigateTool={navigateToTool}
+                initialGuideToolId={guideToolId}
               />
             </div>
           ) : activeToolId && activeToolMeta ? (
             <div className="space-y-4">
+              {/* Compact Active Tool Navigation Bar */}
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   <a
                     href="/"
                     onClick={(e) => navigateToCategory('all', e)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition shrink-0 ${
                       isDark
                         ? 'bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -682,20 +659,24 @@ export function App() {
                     All Tools
                   </a>
                   <a
-                    href={`/category/${activeToolMeta.category}`}
-                    onClick={(e) => navigateToCategory(activeToolMeta.category, e)}
-                    className={`hidden sm:inline-block text-xs font-medium hover:underline ${
-                      isDark ? 'text-zinc-400' : 'text-slate-500'
+                    href="/how-to-use"
+                    onClick={(e) => navigateToStaticPage('how-to-use', e, activeToolMeta.id)}
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition shrink-0 ${
+                      isDark
+                        ? 'bg-zinc-900 border-zinc-800 text-indigo-400 hover:bg-zinc-800'
+                        : 'bg-white border-slate-200 text-indigo-600 hover:bg-slate-100'
                     }`}
+                    title="Step-by-step guide for this tool"
                   >
-                    {activeToolMeta.categoryLabel}
+                    <BookOpen className="w-3.5 h-3.5" />
+                    <span>How to Use</span>
                   </a>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                   <button
                     onClick={copyShareUrl}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
                       isDark
                         ? 'bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800'
                         : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -705,12 +686,12 @@ export function App() {
                     {copiedUrl ? (
                       <>
                         <Check className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>Link Copied</span>
+                        <span className="hidden sm:inline">Copied</span>
                       </>
                     ) : (
                       <>
                         <Share2 className="w-3.5 h-3.5 text-indigo-500" />
-                        <span>Share Tool</span>
+                        <span className="hidden sm:inline">Share</span>
                       </>
                     )}
                   </button>
@@ -719,7 +700,7 @@ export function App() {
                     aria-label="Quick switch tool"
                     value={activeToolId}
                     onChange={(e) => navigateToTool(e.target.value as ToolId)}
-                    className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${
+                    className={`max-w-[155px] sm:max-w-none px-2.5 py-1.5 rounded-lg border text-xs font-semibold truncate ${
                       isDark
                         ? 'bg-zinc-900 border-zinc-800 text-zinc-200'
                         : 'bg-white border-slate-200 text-slate-800'
@@ -734,13 +715,8 @@ export function App() {
                 </div>
               </div>
 
+              {/* Core Focused Tool Workspace (Zero text walls or duplicate redirection grids below) */}
               {renderActiveTool()}
-
-              <ToolSeoSection
-                tool={activeToolMeta}
-                isDark={isDark}
-                onNavigateTool={navigateToTool}
-              />
             </div>
           ) : (
             <InteractiveLanding
@@ -753,14 +729,14 @@ export function App() {
             />
           )}
 
-          {/* Comprehensive Crawlable Footer with Legal, Security, Support & Tool Links */}
+          {/* Clean Crawlable Footer */}
           <footer
-            className={`mt-14 pt-10 border-t space-y-8 text-xs ${
+            className={`mt-12 pt-8 border-t space-y-6 text-xs ${
               isDark ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-600'
             }`}
           >
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <p
                   className={`font-bold uppercase tracking-wider text-[11px] ${
                     isDark ? 'text-white' : 'text-slate-900'
@@ -779,7 +755,7 @@ export function App() {
                 </ul>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <p
                   className={`font-bold uppercase tracking-wider text-[11px] ${
                     isDark ? 'text-white' : 'text-slate-900'
@@ -798,7 +774,7 @@ export function App() {
                 </ul>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <p
                   className={`font-bold uppercase tracking-wider text-[11px] ${
                     isDark ? 'text-white' : 'text-slate-900'
@@ -819,7 +795,7 @@ export function App() {
                 </ul>
               </div>
 
-              <div className="space-y-2.5">
+              <div className="space-y-2">
                 <p
                   className={`font-bold uppercase tracking-wider text-[11px] ${
                     isDark ? 'text-white' : 'text-slate-900'
@@ -850,28 +826,27 @@ export function App() {
 
             {/* Contact & Coming Soon Mobile Apps Row */}
             <div
-              className={`p-4 rounded-xl border flex flex-wrap items-center justify-between gap-4 ${
+              className={`p-3.5 rounded-xl border flex flex-wrap items-center justify-between gap-3 ${
                 isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-50 border-slate-200/80'
               }`}
             >
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-wrap items-center gap-3 text-[11px]">
                 <span
                   className={`inline-flex items-center gap-1.5 font-semibold ${
                     isDark ? 'text-zinc-200' : 'text-slate-800'
                   }`}
                 >
-                  <Smartphone className="w-4 h-4 text-indigo-500" />
-                  Coming Soon: Native iOS & Android Apps
+                  <Smartphone className="w-3.5 h-3.5 text-indigo-500" />
+                  Coming Soon: iOS & Android Apps
                 </span>
                 <span className="hidden sm:inline text-slate-300 dark:text-zinc-700">|</span>
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1">
                   <Mail className="w-3.5 h-3.5 text-indigo-500" />
-                  Contact:{' '}
                   <a href="mailto:contact@breathy.in" className="font-semibold text-indigo-500 hover:underline">
                     contact@breathy.in
                   </a>
                 </span>
-                <span className="inline-flex items-center gap-1.5">
+                <span className="inline-flex items-center gap-1">
                   Support:{' '}
                   <a href="mailto:support@breathy.in" className="font-semibold text-indigo-500 hover:underline">
                     support@breathy.in
@@ -889,9 +864,12 @@ export function App() {
               </a>
             </div>
 
-            <div className="pt-6 border-t border-slate-200 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-4 text-[11px]">
-              <p>© {new Date().getFullYear()} CommonTool. Free Client-Side Utility Suite — All Rights Reserved.</p>
-              <div className="flex flex-wrap gap-4">
+            <div className="pt-4 border-t border-slate-200 dark:border-zinc-800/80 flex flex-wrap items-center justify-between gap-3 text-[11px]">
+              <p>© {new Date().getFullYear()} CommonTool. Free Client-Side Utility Suite.</p>
+              <div className="flex flex-wrap gap-3">
+                <a href="/how-to-use" onClick={(e) => navigateToStaticPage('how-to-use', e)} className="hover:underline font-medium">
+                  How to Use
+                </a>
                 <a href="/donate" onClick={(e) => navigateToStaticPage('donate', e)} className="hover:underline text-rose-500 font-semibold">
                   Donate ❤️
                 </a>
@@ -899,13 +877,10 @@ export function App() {
                   Privacy Policy
                 </a>
                 <a href="/terms-and-conditions" onClick={(e) => navigateToStaticPage('terms-and-conditions', e)} className="hover:underline">
-                  Terms & Conditions
-                </a>
-                <a href="/security" onClick={(e) => navigateToStaticPage('security', e)} className="hover:underline">
-                  Security Architecture
+                  Terms
                 </a>
                 <a href="/help-and-support" onClick={(e) => navigateToStaticPage('help-and-support', e)} className="hover:underline">
-                  Help & Support
+                  Support
                 </a>
               </div>
             </div>
@@ -962,12 +937,35 @@ export function App() {
             }`}
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-zinc-800">
-              <span className="text-sm font-bold">All 18 Tools & Pages</span>
+              <span className="text-sm font-bold">All 18 Tools & Guides</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400"
               >
                 <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex gap-2">
+              <a
+                href="/how-to-use"
+                onClick={(e) => navigateToStaticPage('how-to-use', e)}
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                How to Use
+              </a>
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  handleInstallPwaClick();
+                }}
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer ${
+                  isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
+                }`}
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-500" />
+                Install App
               </button>
             </div>
 
@@ -994,7 +992,7 @@ export function App() {
             </div>
 
             <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-1">
-              <p className="px-3 text-[10px] font-bold uppercase text-slate-500">Company & Legal</p>
+              <p className="px-3 text-[10px] font-bold uppercase text-slate-500">Guides, Company & Legal</p>
               {(Object.keys(STATIC_PAGES_META) as StaticPageId[]).map((pid) => (
                 <a
                   key={pid}

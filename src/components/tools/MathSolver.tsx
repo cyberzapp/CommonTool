@@ -6,12 +6,14 @@ import {
   Grid,
   ArrowLeftRight,
   Download,
+  Info,
 } from 'lucide-react';
 
 type MathTab = 'grapher' | 'solver' | 'matrix' | 'units';
 
 export const MathSolver: React.FC = () => {
   const [activeTab, setActiveTab] = useState<MathTab>('grapher');
+  const [showInfo, setShowInfo] = useState(false);
 
   // 1. Function Grapher State
   const [fn1, setFn1] = useState('sin(x) * x');
@@ -191,16 +193,24 @@ export const MathSolver: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-900/70 border border-slate-800 rounded-2xl p-5">
-        <div>
-          <h2 className="text-xl font-bold text-white flex items-center gap-2.5">
-            <Sigma className="w-6 h-6 text-cyan-400" />
-            Math & Scientific Solver / Grapher
-          </h2>
-          <p className="text-sm text-slate-400 mt-1">
+      <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
+        <div className="flex items-center gap-2.5">
+          <Sigma className="w-5 h-5 text-cyan-400 shrink-0" />
+          <h2 className="text-lg font-bold text-white">Math & Scientific Solver / Grapher</h2>
+          <button
+            onClick={() => setShowInfo((v) => !v)}
+            aria-label="Toggle tool info"
+            className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            title="About this tool"
+          >
+            <Info className="w-4 h-4" />
+          </button>
+        </div>
+        {showInfo && (
+          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
             Interactive multi-function grapher, quadratic & symbolic calculus solver, matrix calculator, and unit converter.
           </p>
-        </div>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
