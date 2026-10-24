@@ -42,6 +42,13 @@ import {
   Eye,
   EyeOff,
   FileCheck,
+  PanelLeft,
+  RotateCw,
+  Maximize2,
+  FileText,
+  ChevronUp,
+  ChevronDown,
+  Layers,
 } from 'lucide-react';
 import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 
@@ -489,6 +496,11 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const [allowCopyingText, setAllowCopyingText] = useState(false);
 
+  // Left Sidebar & Page Thumbnails State
+  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [hoveredTextId, setHoveredTextId] = useState<string | null>(null);
+
   const [isRendering, setIsRendering] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -683,10 +695,98 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       }
       setIsOriginalEncrypted(originalSecured);
       setExportSecurityMode(originalSecured ? 'reencrypt' : 'none');
+
+      // Asynchronously generate visual page thumbnails for the left navigator
+      generateThumbnails(bytes, total);
     } catch (err: unknown) {
       setStatusBanner({
         type: 'error',
         message: `Could not open PDF: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    } finally {
+      setIsRendering(false);
+    }
+  };
+
+  // Generate lightweight page thumbnails in the background for instant navigation
+  const generateThumbnails = useCallback(async (bytes: Uint8Array, total: number) => {
+    try {
+      const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) });
+      const pdf = await loadingTask.promise;
+      const count = Math.min(total, 40);
+      const thumbs: Record<number, string> = {};
+
+      for (let p = 1; p <= count; p++) {
+        try {
+          const page = await pdf.getPage(p);
+          const viewport = page.getViewport({ scale: 0.2 });
+          const canvas = document.createElement('canvas');
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            thumbs[p] = canvas.toDataURL('image/jpeg', 0.82);
+          }
+        } catch {
+          // ignore single page failure
+        }
+      }
+      setThumbnails(thumbs);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Rotate a specific page by 90 degrees directly from the thumbnail rail
+  const handleRotatePage = async (targetPageNum: number) => {
+    if (!pdfBytes) return;
+    try {
+      setIsRendering(true);
+      const pdfDoc = await PDFDocument.load(pdfBytes.slice(0), { ignoreEncryption: true });
+      const pages = pdfDoc.getPages();
+      const targetIndex = targetPageNum - 1;
+      if (targetIndex >= 0 && targetIndex < pages.length) {
+        const page = pages[targetIndex];
+        const currentRot = page.getRotation().angle;
+        page.setRotation(degrees((currentRot + 90) % 360));
+        const updatedBytes = await pdfDoc.save();
+        await loadPdfBuffer(new Uint8Array(updatedBytes), fileName || 'Document.pdf');
+        setStatusBanner({
+          type: 'success',
+          message: `Rotated Page ${targetPageNum} by 90°!`,
+        });
+      }
+    } catch (err: unknown) {
+      setStatusBanner({
+        type: 'error',
+        message: `Failed to rotate page: ${err instanceof Error ? err.message : String(err)}`,
+      });
+    } finally {
+      setIsRendering(false);
+    }
+  };
+
+  // Delete a specific page from the document directly from the thumbnail rail
+  const handleDeletePage = async (targetPageNum: number) => {
+    if (!pdfBytes || pageCount <= 1) return;
+    if (!window.confirm(`Are you sure you want to delete Page ${targetPageNum}?`)) return;
+    try {
+      setIsRendering(true);
+      const pdfDoc = await PDFDocument.load(pdfBytes.slice(0), { ignoreEncryption: true });
+      pdfDoc.removePage(targetPageNum - 1);
+      const updatedBytes = await pdfDoc.save();
+      const nextTargetPage = Math.min(currentPage, pageCount - 1);
+      await loadPdfBuffer(new Uint8Array(updatedBytes), fileName || 'Document.pdf');
+      setCurrentPage(Math.max(1, nextTargetPage));
+      setStatusBanner({
+        type: 'success',
+        message: `Deleted Page ${targetPageNum} successfully!`,
+      });
+    } catch (err: unknown) {
+      setStatusBanner({
+        type: 'error',
+        message: `Failed to delete page: ${err instanceof Error ? err.message : String(err)}`,
       });
     } finally {
       setIsRendering(false);
@@ -1747,143 +1847,47 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Top Professional Ribbon Toolbar */}
-          <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2.5 sticky top-14 z-20 backdrop-blur-md shadow-xl">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              {/* Left: Tools + Undo/Redo + Replace Text */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {/* Undo & Redo Controls */}
-                <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
-                  <button
-                    onClick={handleUndo}
-                    disabled={historyIndex <= 0}
-                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
-                    title="Undo (Ctrl+Z / Cmd+Z)"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={handleRedo}
-                    disabled={historyIndex >= history.length - 1}
-                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
-                    title="Redo (Ctrl+Y / Cmd+Shift+Z)"
-                  >
-                    <Redo2 className="w-3.5 h-3.5" />
-                  </button>
+          {/* 1. Global Studio Navigation Bar (Sticky Top) */}
+          <div className="bg-slate-900/95 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl backdrop-blur-md sticky top-14 z-30">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* Left: Sidebar Toggle, Document Name & Page Nav */}
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSidebarOpen((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                    isSidebarOpen
+                      ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                  title="Toggle Visual Page Thumbnails"
+                >
+                  <PanelLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Pages</span>
+                  <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] text-slate-300 font-bold">
+                    {pageCount}
+                  </span>
+                </button>
+
+                <div className="h-5 w-px bg-slate-800 hidden sm:block" />
+
+                <div className="flex items-center gap-1.5 max-w-[180px] sm:max-w-xs truncate">
+                  <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
+                  <span className="text-xs font-bold text-white truncate" title={fileName}>
+                    {fileName || 'Document.pdf'}
+                  </span>
                 </div>
 
-                <div className="h-5 w-px bg-slate-800 mx-0.5" />
-
-                <button
-                  onClick={() => setToolMode('edit-text')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                    toolMode === 'edit-text'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
-                  }`}
-                  title="Click any existing text on the PDF to edit it in-place"
-                >
-                  <Type className="w-3.5 h-3.5" />
-                  <span>Edit PDF Text</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    if (selectedText) {
-                      setFindQuery(selectedText.text);
-                    }
-                    setReplaceModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
-                  title="Find & Replace text across the PDF (Ctrl+F)"
-                >
-                  <Replace className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Replace Text</span>
-                </button>
-
-                <button
-                  onClick={() => setToolMode('add-text')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                    toolMode === 'add-text'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
-                  }`}
-                  title="Click anywhere on the page to insert a new text block"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Text</span>
-                </button>
-
-                <button
-                  onClick={() => setToolMode('whiteout')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                    toolMode === 'whiteout'
-                      ? 'bg-indigo-600 text-white shadow-xs'
-                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
-                  }`}
-                  title="Click on the page to place a whiteout / erase box"
-                >
-                  <Eraser className="w-3.5 h-3.5" />
-                  <span>Whiteout</span>
-                </button>
-
-                <button
-                  onClick={() => setToolMode('highlight')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
-                    toolMode === 'highlight'
-                      ? 'bg-amber-500 text-slate-950 font-bold'
-                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
-                  }`}
-                  title="Click on the page to highlight text"
-                >
-                  <Highlighter className="w-3.5 h-3.5" />
-                  <span>Highlight</span>
-                </button>
-
-                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer">
-                  <ImageIcon className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Add Image</span>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg"
-                    className="hidden"
-                    onChange={(e) => handleInsertImageUpload(e.target.files?.[0])}
-                  />
-                </label>
-
-                <button
-                  onClick={() => setSignatureModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
-                >
-                  <PenTool className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Sign</span>
-                </button>
-
-                <button
-                  onClick={() => setStampModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
-                  title="Stamp official badges (Approved, Confidential, Void, Paid, etc.)"
-                >
-                  <Stamp className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Stamps</span>
-                </button>
-
-                <button
-                  onClick={() => setWatermarkModalOpen(true)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer ${
-                    watermarkSettings.enabled
-                      ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
-                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
-                  }`}
-                  title="Configure diagonal watermark across pages"
-                >
-                  <Droplet className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Watermark {watermarkSettings.enabled && '• ON'}</span>
-                </button>
+                {isOriginalEncrypted && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
+                    <Lock className="w-2.5 h-2.5" />
+                    <span className="hidden md:inline">SECURED</span>
+                  </span>
+                )}
               </div>
 
-              {/* Right: Page Switcher, Zoom & Export */}
-              <div className="flex items-center gap-1.5">
+              {/* Center: Quick Page Navigator & Zoom Controls */}
+              <div className="flex items-center gap-2">
                 <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -1893,8 +1897,8 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                   >
                     <ChevronLeft className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-xs font-semibold text-slate-200 px-1">
-                    Page {currentPage} / {pageCount}
+                  <span className="text-xs font-semibold text-slate-200 px-1 min-w-[70px] text-center">
+                    {currentPage} / {pageCount}
                   </span>
                   <button
                     onClick={() => setCurrentPage((p) => Math.min(pageCount, p + 1))}
@@ -1906,7 +1910,28 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                   </button>
                 </div>
 
-                <div className="hidden sm:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
+                {/* Undo / Redo */}
+                <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+                  <button
+                    onClick={handleUndo}
+                    disabled={historyIndex <= 0}
+                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
+                    title="Undo (Ctrl+Z)"
+                  >
+                    <Undo2 className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={handleRedo}
+                    disabled={historyIndex >= history.length - 1}
+                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
+                    title="Redo (Ctrl+Y)"
+                  >
+                    <Redo2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Zoom Stepper */}
+                <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
                   <button
                     onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}
                     className="p-1 text-slate-400 hover:text-white cursor-pointer"
@@ -1914,7 +1939,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
-                  <span className="text-xs font-mono-code text-slate-300 w-11 text-center">
+                  <span className="text-xs font-mono font-bold text-slate-300 w-11 text-center">
                     {Math.round(zoom * 100)}%
                   </span>
                   <button
@@ -1925,13 +1950,13 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                     <ZoomIn className="w-3.5 h-3.5" />
                   </button>
                 </div>
+              </div>
 
-                <label
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
-                  title="Upload a different PDF file to edit"
-                >
+              {/* Right: Change PDF & Primary Download */}
+              <div className="flex items-center gap-2">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer">
                   <Upload className="w-3.5 h-3.5 text-indigo-400" />
-                  <span className="hidden md:inline">Change PDF</span>
+                  <span className="hidden sm:inline">Change PDF</span>
                   <input
                     type="file"
                     accept="application/pdf"
@@ -1950,7 +1975,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                       }
                     }}
                     disabled={isExporting}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-md"
+                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-lg shadow-indigo-600/30"
                   >
                     <Download className="w-3.5 h-3.5" />
                     <span>{isExporting ? 'Exporting...' : `Download PDF${modifiedCount > 0 ? ` (${modifiedCount})` : ''}`}</span>
@@ -1970,53 +1995,246 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Sub-bar Guidance */}
-            <div className="flex items-center justify-between pt-1 border-t border-slate-800/70 text-[11px] text-slate-400">
-              <span className="flex items-center gap-2">
-                {isOriginalEncrypted && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
-                    <Lock className="w-2.5 h-2.5" />
-                    <span>SECURED PDF</span>
+          {/* 2. Categorized Functional Ribbon */}
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-2.5 shadow-lg">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              {/* Grouped Action Tools */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Edit Text */}
+                <button
+                  onClick={() => setToolMode('edit-text')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    toolMode === 'edit-text'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-indigo-400'
+                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
+                  }`}
+                  title="Click any text on the page to edit directly"
+                >
+                  <Type className="w-3.5 h-3.5" />
+                  <span>Edit Text</span>
+                </button>
+
+                {/* Add Text */}
+                <button
+                  onClick={() => setToolMode('add-text')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    toolMode === 'add-text'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-indigo-400'
+                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
+                  }`}
+                  title="Click anywhere to insert a new text box"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Text</span>
+                </button>
+
+                {/* Replace Text */}
+                <button
+                  onClick={() => {
+                    if (selectedText) {
+                      setFindQuery(selectedText.text);
+                    }
+                    setReplaceModalOpen(true);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                  title="Find & Replace text across document (Ctrl+F)"
+                >
+                  <Replace className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Replace Text</span>
+                </button>
+
+                <div className="h-5 w-px bg-slate-800 mx-0.5" />
+
+                {/* Whiteout */}
+                <button
+                  onClick={() => setToolMode('whiteout')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    toolMode === 'whiteout'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25 ring-1 ring-indigo-400'
+                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
+                  }`}
+                  title="Click on the page to place a whiteout / erase patch"
+                >
+                  <Eraser className="w-3.5 h-3.5" />
+                  <span>Whiteout</span>
+                </button>
+
+                {/* Highlight */}
+                <button
+                  onClick={() => setToolMode('highlight')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                    toolMode === 'highlight'
+                      ? 'bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/25'
+                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
+                  }`}
+                  title="Highlight important text"
+                >
+                  <Highlighter className="w-3.5 h-3.5" />
+                  <span>Highlight</span>
+                </button>
+
+                <div className="h-5 w-px bg-slate-800 mx-0.5" />
+
+                {/* Sign */}
+                <button
+                  onClick={() => setSignatureModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                >
+                  <PenTool className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Sign</span>
+                </button>
+
+                {/* Stamp */}
+                <button
+                  onClick={() => setStampModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                  title="Stamp official badges (Approved, Confidential, Void, Paid, etc.)"
+                >
+                  <Stamp className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Stamps</span>
+                </button>
+
+                {/* Image */}
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer">
+                  <ImageIcon className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Image</span>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg"
+                    className="hidden"
+                    onChange={(e) => handleInsertImageUpload(e.target.files?.[0])}
+                  />
+                </label>
+
+                {/* Watermark */}
+                <button
+                  onClick={() => setWatermarkModalOpen(true)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer ${
+                    watermarkSettings.enabled
+                      ? 'bg-sky-500/20 border-sky-500/50 text-sky-300'
+                      : 'bg-slate-950 border-slate-800 text-slate-300 hover:text-white'
+                  }`}
+                  title="Configure diagonal watermark"
+                >
+                  <Droplet className="w-3.5 h-3.5 text-sky-400" />
+                  <span>Watermark {watermarkSettings.enabled && '• ON'}</span>
+                </button>
+              </div>
+
+              {/* Status / Guidance Sub-text */}
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                {modifiedCount > 0 ? (
+                  <span className="px-2 py-0.5 rounded-lg bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-bold">
+                    {modifiedCount} edits ready
+                  </span>
+                ) : (
+                  <span className="hidden lg:inline text-slate-500">
+                    {toolMode === 'edit-text' && 'Click any text on the page below to edit directly'}
+                    {toolMode === 'add-text' && 'Click anywhere on the document to insert a text box'}
+                    {toolMode === 'whiteout' && 'Click and drag to erase unwanted areas'}
+                    {toolMode === 'highlight' && 'Click on the page to place a translucent highlight bar'}
                   </span>
                 )}
-                <span>
-                  {toolMode === 'edit-text' &&
-                    `Click any text on the page below to edit it directly (${currentPageItems.length} editable blocks on Page ${currentPage}).`}
-                  {toolMode === 'add-text' &&
-                    'Click anywhere on the PDF page below to insert a new text block.'}
-                  {toolMode === 'whiteout' &&
-                    'Click anywhere on the PDF page below to place a whiteout / erase cover patch.'}
-                  {toolMode === 'highlight' &&
-                    'Click anywhere on the PDF page below to place a translucent highlight bar.'}
-                </span>
-                {modifiedCount > 0 && (
-                  <span className="text-emerald-400 font-semibold">• {modifiedCount} edits ready</span>
-                )}
-              </span>
-              {isRendering ? (
-                <span className="text-indigo-400 font-semibold animate-pulse">Scanning page text...</span>
-              ) : (
-                <span className="hidden md:inline text-slate-500">Shortcuts: Ctrl+Z Undo • Ctrl+Y Redo • Ctrl+F Replace • Esc Deselect</span>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Interactive WYSIWYG PDF Page Canvas */}
-          <div className="bg-slate-950 border border-slate-800 rounded-2xl p-3 sm:p-6 overflow-auto flex justify-center max-h-[78vh]">
-            <div
-              ref={pageContainerRef}
-              onClick={handlePageSurfaceClick}
-              onMouseMove={handleMouseMoveOnPage}
-              onMouseUp={handleMouseUpOnPage}
-              className={`relative shadow-2xl select-none bg-white transition-all ${
-                toolMode !== 'edit-text' ? 'cursor-crosshair' : 'cursor-default'
-              }`}
-              style={{
-                width: `${pageDims.width * zoom}px`,
-                height: `${pageDims.height * zoom}px`,
-              }}
-            >
+          {/* 3. Main Workspace Studio: Left Page Thumbnails + Center Studio Desk */}
+          <div className="flex flex-col lg:flex-row gap-4 items-start">
+            {/* Left Page Thumbnail Rail (Collapsible) */}
+            {isSidebarOpen && (
+              <div className="w-full lg:w-44 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col shrink-0 space-y-2.5 max-h-[85vh]">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+                  <div className="flex items-center gap-1.5 font-bold text-white">
+                    <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Pages ({pageCount})</span>
+                  </div>
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-1 rounded-lg hover:bg-slate-800 text-slate-400 hover:text-white cursor-pointer"
+                    title="Hide Page Thumbnails"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                {/* Thumbnails Scroll List */}
+                <div className="flex lg:flex-col gap-2.5 overflow-auto pr-1">
+                  {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => {
+                    const isCur = currentPage === p;
+                    const thumbUrl = thumbnails[p];
+                    return (
+                      <div
+                        key={p}
+                        onClick={() => setCurrentPage(p)}
+                        className={`group relative rounded-xl border p-1.5 cursor-pointer transition-all flex flex-col items-center gap-1 shrink-0 ${
+                          isCur
+                            ? 'bg-indigo-600/15 border-indigo-500 ring-2 ring-indigo-500/40'
+                            : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                        }`}
+                      >
+                        {/* Page Preview Box */}
+                        <div className="w-24 h-32 bg-white rounded-md overflow-hidden flex items-center justify-center relative shadow-sm">
+                          {thumbUrl ? (
+                            <img src={thumbUrl} alt={`Page ${p}`} className="w-full h-full object-contain" />
+                          ) : (
+                            <div className="text-[10px] text-slate-400 animate-pulse">Page {p}</div>
+                          )}
+
+                          {/* Quick Action Overlay (Rotate / Delete) */}
+                          <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-xs opacity-0 group-hover:opacity-100 flex items-center justify-center gap-1.5 transition-opacity">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleRotatePage(p);
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-800 hover:bg-indigo-600 text-white cursor-pointer transition"
+                              title="Rotate 90°"
+                            >
+                              <RotateCw className="w-3 h-3" />
+                            </button>
+                            {pageCount > 1 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeletePage(p);
+                                }}
+                                className="p-1.5 rounded-lg bg-slate-800 hover:bg-rose-600 text-white cursor-pointer transition"
+                                title="Delete Page"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-semibold ${isCur ? 'text-indigo-400' : 'text-slate-400'}`}>
+                          Page {p}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Center Studio Desk (Spacious Document Stage) */}
+            <div className="flex-1 w-full bg-slate-950/70 border border-slate-800 rounded-2xl p-4 sm:p-8 flex justify-center overflow-auto min-h-[75vh] max-h-[85vh]">
+              <div
+                ref={pageContainerRef}
+                onClick={handlePageSurfaceClick}
+                onMouseMove={handleMouseMoveOnPage}
+                onMouseUp={handleMouseUpOnPage}
+                className={`relative shadow-2xl select-none bg-white transition-all rounded-xs ring-1 ring-slate-800/80 ${
+                  toolMode !== 'edit-text' ? 'cursor-crosshair' : 'cursor-default'
+                }`}
+                style={{
+                  width: `${pageDims.width * zoom}px`,
+                  height: `${pageDims.height * zoom}px`,
+                }}
+              >
               {/* Underlying High-DPI PDF Bitmap Canvas */}
               <canvas
                 ref={bgCanvasRef}
@@ -2161,6 +2379,8 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                           setSelectedTextId(item.id);
                           setSelectedShapeId(null);
                         }}
+                        onMouseEnter={() => setHoveredTextId(item.id)}
+                        onMouseLeave={() => setHoveredTextId(null)}
                         style={{
                           position: 'absolute',
                           left: `${(item.x - 1) * zoom}px`,
@@ -2176,12 +2396,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                         }}
                         className={`group transition-all ${
                           isSelected
-                            ? 'ring-2 ring-blue-500 z-30 shadow-md bg-white/40'
+                            ? 'ring-2 ring-indigo-500 z-30 shadow-md bg-white/40'
                             : isFindMatch
                             ? 'ring-2 ring-amber-400 bg-amber-300/30 z-25'
                             : isModified
-                            ? 'ring-1 ring-emerald-500/60 hover:ring-blue-500 z-20'
-                            : 'hover:ring-1 hover:ring-blue-500/70 hover:bg-blue-500/5 z-10'
+                            ? 'ring-1 ring-emerald-500/70 z-20'
+                            : hoveredTextId === item.id
+                            ? 'ring-1 ring-indigo-500/80 bg-indigo-500/10 z-10'
+                            : 'hover:ring-1 hover:ring-indigo-400/50 hover:bg-indigo-500/5 z-0'
                         }`}
                       >
                         {/* 8-Point Transform Bounding Box Handles when selected */}
@@ -2566,6 +2788,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
             </div>
           </div>
         </div>
+      </div>
       )}
 
       {/* PDFSimpli-Style "Replace Text" / Find & Replace Modal */}
