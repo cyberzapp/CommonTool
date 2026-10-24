@@ -45,6 +45,8 @@ import {
   PanelLeft,
   RotateCw,
   Maximize2,
+  Minimize2,
+  ArrowLeft,
   FileText,
   ChevronUp,
   ChevronDown,
@@ -415,6 +417,7 @@ export interface PdfEditorProps {
   initialPdfBytes?: Uint8Array | null;
   initialFileName?: string;
   onPdfSaved?: (bytes: Uint8Array, filename: string) => void;
+  onSwitchPdfTab?: (tab: 'merge' | 'split' | 'compress' | 'rotate' | 'convert' | 'sign') => void;
 }
 
 export const PdfEditor: React.FC<PdfEditorProps> = ({
@@ -422,6 +425,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   initialPdfBytes = null,
   initialFileName = '',
   onPdfSaved,
+  onSwitchPdfTab,
 }) => {
   const [showInfo, setShowInfo] = useState(false);
   const [pdfBytes, setPdfBytes] = useState<Uint8Array | null>(null);
@@ -430,6 +434,10 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1); // 1-based
   const [pageDims, setPageDims] = useState<PageDimensions>({ width: 595, height: 842 });
   const [zoom, setZoom] = useState<number>(1.15);
+
+  // Full-Screen Studio & Tools Menu State
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [pdfToolsMenuOpen, setPdfToolsMenuOpen] = useState(false);
 
   const [toolMode, setToolMode] = useState<EditorToolMode>('edit-text');
   const [textItems, setTextItems] = useState<EditablePdfTextItem[]>([]);
@@ -504,6 +512,27 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   const [isRendering, setIsRendering] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Lock body scroll when in Full-Screen Studio mode
+  useEffect(() => {
+    if (isFullScreen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isFullScreen]);
+
+  // Close tools dropdown menu on external click
+  useEffect(() => {
+    const handleGlobalClick = () => setPdfToolsMenuOpen(false);
+    if (pdfToolsMenuOpen) {
+      window.addEventListener('click', handleGlobalClick);
+      return () => window.removeEventListener('click', handleGlobalClick);
+    }
+  }, [pdfToolsMenuOpen]);
 
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const pageContainerRef = useRef<HTMLDivElement | null>(null);
@@ -695,6 +724,9 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       }
       setIsOriginalEncrypted(originalSecured);
       setExportSecurityMode(originalSecured ? 'reencrypt' : 'none');
+
+      // Automatically maximize into focused Full-Screen Studio as requested
+      setIsFullScreen(true);
 
       // Asynchronously generate visual page thumbnails for the left navigator
       generateThumbnails(bytes, total);
@@ -1717,9 +1749,15 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Compact Header with (i) Info Button */}
-      {!embedded && (
+    <div
+      className={
+        isFullScreen && pdfBytes
+          ? 'fixed inset-0 z-50 bg-slate-950 flex flex-col w-screen h-screen overflow-hidden animate-in fade-in duration-200'
+          : 'space-y-4'
+      }
+    >
+      {/* Compact Header with (i) Info Button (hidden in Full Screen Studio mode) */}
+      {!embedded && !isFullScreen && (
         <div className="bg-slate-900/70 border border-slate-800 rounded-2xl p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
@@ -1846,12 +1884,40 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
           </div>
         </div>
       ) : (
-        <div className="space-y-3">
-          {/* 1. Global Studio Navigation Bar (Sticky Top) */}
-          <div className="bg-slate-900/95 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl backdrop-blur-md sticky top-14 z-30">
+        <div className={isFullScreen ? 'flex flex-col h-full w-full overflow-hidden' : 'space-y-3'}>
+          {/* 1. Global Studio Navigation Bar */}
+          <div
+            className={`bg-slate-900/95 border-slate-800 px-4 py-2.5 shadow-xl backdrop-blur-md z-30 shrink-0 ${
+              isFullScreen ? 'border-b w-full' : 'border rounded-2xl sticky top-14'
+            }`}
+          >
             <div className="flex flex-wrap items-center justify-between gap-3">
-              {/* Left: Sidebar Toggle, Document Name & Page Nav */}
+              {/* Left: Exit Studio / Full-Screen Toggle + Document Name & Pages */}
               <div className="flex items-center gap-2">
+                {isFullScreen ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsFullScreen(false)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold cursor-pointer border border-slate-700 shadow-sm transition"
+                    title="Exit Full-Screen Studio & Return to CommonTool"
+                  >
+                    <ArrowLeft className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Exit Studio</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsFullScreen(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold cursor-pointer border border-indigo-500/30 shadow-sm transition"
+                    title="Maximize into Full-Screen Focused Studio"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                    <span>Full Screen</span>
+                  </button>
+                )}
+
+                <div className="h-5 w-px bg-slate-800" />
+
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen((v) => !v)}
@@ -1871,7 +1937,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
 
                 <div className="h-5 w-px bg-slate-800 hidden sm:block" />
 
-                <div className="flex items-center gap-1.5 max-w-[180px] sm:max-w-xs truncate">
+                <div className="flex items-center gap-1.5 max-w-[170px] sm:max-w-xs truncate">
                   <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
                   <span className="text-xs font-bold text-white truncate" title={fileName}>
                     {fileName || 'Document.pdf'}
@@ -1886,8 +1952,59 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                 )}
               </div>
 
-              {/* Center: Quick Page Navigator & Zoom Controls */}
+              {/* Center: Other PDF Tools Dropdown + Page Navigator & Zoom Controls */}
               <div className="flex items-center gap-2">
+                {onSwitchPdfTab && (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPdfToolsMenuOpen((v) => !v);
+                      }}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                      title="More PDF Tools (Merge, Split, Compress, Rotate, Convert, E-Sign)"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                      <span className="hidden xl:inline">More PDF Tools</span>
+                      <ChevronDown className="w-3 h-3 text-slate-400" />
+                    </button>
+
+                    {pdfToolsMenuOpen && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute left-0 top-full mt-1.5 w-52 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl p-1.5 z-50 text-xs space-y-0.5 animate-in fade-in zoom-in-95"
+                      >
+                        {[
+                          { id: 'merge', label: 'Merge PDFs', desc: 'Combine multiple files' },
+                          { id: 'split', label: 'Split / Extract', desc: 'Extract specific pages' },
+                          { id: 'compress', label: 'Compress PDF', desc: 'Reduce file size' },
+                          { id: 'rotate', label: 'Rotate Pages', desc: 'Orient all or select pages' },
+                          { id: 'convert', label: 'Convert PDF', desc: 'Export to Word, Excel, Images' },
+                          { id: 'sign', label: 'E-Sign', desc: 'Place legal signatures' },
+                        ].map((item) => (
+                          <button
+                            key={item.id}
+                            onClick={() => {
+                              setPdfToolsMenuOpen(false);
+                              setIsFullScreen(false);
+                              onSwitchPdfTab(item.id as any);
+                            }}
+                            className="w-full text-left px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition flex items-center justify-between group"
+                          >
+                            <div>
+                              <p className="font-semibold text-white group-hover:text-indigo-300">{item.label}</p>
+                              <p className="text-[10px] text-slate-500">{item.desc}</p>
+                            </div>
+                            <span className="text-[10px] text-slate-500 group-hover:text-indigo-400">→</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Page Stepper */}
                 <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
                   <button
                     onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
@@ -2142,11 +2259,23 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
           </div>
 
           {/* 3. Main Workspace Studio: Left Page Thumbnails + Center Studio Desk */}
-          <div className="flex flex-col lg:flex-row gap-4 items-start">
+          <div
+            className={
+              isFullScreen
+                ? 'flex-1 overflow-hidden flex flex-col lg:flex-row gap-3 items-stretch px-3 pb-3'
+                : 'flex flex-col lg:flex-row gap-4 items-start'
+            }
+          >
             {/* Left Page Thumbnail Rail (Collapsible) */}
             {isSidebarOpen && (
-              <div className="w-full lg:w-44 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col shrink-0 space-y-2.5 max-h-[85vh]">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs">
+              <div
+                className={
+                  isFullScreen
+                    ? 'w-full lg:w-44 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col shrink-0 space-y-2.5 h-full overflow-hidden shadow-lg'
+                    : 'w-full lg:w-44 bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col shrink-0 space-y-2.5 max-h-[85vh]'
+                }
+              >
+                <div className="flex items-center justify-between pb-2 border-b border-slate-800 text-xs shrink-0">
                   <div className="flex items-center gap-1.5 font-bold text-white">
                     <Layers className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Pages ({pageCount})</span>
@@ -2161,7 +2290,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                 </div>
 
                 {/* Thumbnails Scroll List */}
-                <div className="flex lg:flex-col gap-2.5 overflow-auto pr-1">
+                <div className="flex lg:flex-col gap-2.5 overflow-auto pr-1 flex-1">
                   {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => {
                     const isCur = currentPage === p;
                     const thumbUrl = thumbnails[p];
@@ -2221,7 +2350,13 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
             )}
 
             {/* Center Studio Desk (Spacious Document Stage) */}
-            <div className="flex-1 w-full bg-slate-950/70 border border-slate-800 rounded-2xl p-4 sm:p-8 flex justify-center overflow-auto min-h-[75vh] max-h-[85vh]">
+            <div
+              className={
+                isFullScreen
+                  ? 'flex-1 w-full h-full overflow-auto bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-8 flex justify-center items-start shadow-inner'
+                  : 'flex-1 w-full bg-slate-950/70 border border-slate-800 rounded-2xl p-4 sm:p-8 flex justify-center overflow-auto min-h-[75vh] max-h-[85vh]'
+              }
+            >
               <div
                 ref={pageContainerRef}
                 onClick={handlePageSurfaceClick}

@@ -873,6 +873,7 @@ export const PdfMultiTool: React.FC = () => {
           embedded
           initialPdfBytes={singlePdf?.bytes}
           initialFileName={singlePdf?.name}
+          onSwitchPdfTab={(tab) => setActiveTab(tab as PdfTab)}
           onPdfSaved={(bytes, name) => {
             setSinglePdf({
               id: crypto.randomUUID(),
