@@ -51,6 +51,7 @@ import {
   ChevronUp,
   ChevronDown,
   Layers,
+  Copy,
 } from 'lucide-react';
 import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 
@@ -110,6 +111,7 @@ export interface PdfAnnotationShape {
   height: number;
   color: string;
   opacity: number;
+  rotation?: number; // In degrees (0-360)
   imageDataUrl?: string;
 }
 
@@ -469,6 +471,28 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     startXPos: number;
   } | null>(null);
 
+  // Shape Resize & Rotate State (Images, Stamps, Signatures, Highlights, Whiteout)
+  const [resizingShapeHandle, setResizingShapeHandle] = useState<{
+    id: string;
+    handle: 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w';
+    startX: number;
+    startY: number;
+    startShapeX: number;
+    startShapeY: number;
+    startWidth: number;
+    startHeight: number;
+  } | null>(null);
+
+  const [rotatingShape, setRotatingShape] = useState<{
+    id: string;
+    centerX: number;
+    centerY: number;
+    initialRotation: number;
+  } | null>(null);
+
+  const lastLoadedBytesRef = useRef<Uint8Array | null>(null);
+  const activeRenderTaskRef = useRef<any>(null);
+
   // Search & Replace ("Replace Text" Mode)
   const [replaceModalOpen, setReplaceModalOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
@@ -684,7 +708,9 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       setStatusBanner(null);
       const doc = await PDFDocument.load(bytes, { ignoreEncryption: true });
       const total = doc.getPageCount();
-      setPdfBytes(bytes.slice(0)); // Clone bytes into state to prevent detachment
+      const cloned = bytes.slice(0); // Clone bytes into state to prevent detachment
+      lastLoadedBytesRef.current = cloned;
+      setPdfBytes(cloned);
       setFileName(name);
       setPageCount(total);
       setCurrentPage(1);
@@ -729,7 +755,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       setIsFullScreen(true);
 
       // Asynchronously generate visual page thumbnails for the left navigator
-      generateThumbnails(bytes, total);
+      generateThumbnails(cloned, total);
     } catch (err: unknown) {
       setStatusBanner({
         type: 'error',
@@ -770,7 +796,29 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     }
   }, []);
 
-  // Rotate a specific page by 90 degrees directly from the thumbnail rail
+  // Update a single thumbnail in background when a page is rotated
+  const updateSinglePageThumbnail = async (bytes: Uint8Array, pageNum: number) => {
+    try {
+      const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) });
+      const pdf = await loadingTask.promise;
+      if (pageNum < 1 || pageNum > pdf.numPages) return;
+      const page = await pdf.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 0.2 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        const thumbUrl = canvas.toDataURL('image/jpeg', 0.82);
+        setThumbnails((prev) => ({ ...prev, [pageNum]: thumbUrl }));
+      }
+    } catch {
+      // ignore single thumbnail failure
+    }
+  };
+
+  // Rotate a specific page by 90 degrees directly from the thumbnail rail or toolbar
   const handleRotatePage = async (targetPageNum: number) => {
     if (!pdfBytes) return;
     try {
@@ -783,7 +831,42 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         const currentRot = page.getRotation().angle;
         page.setRotation(degrees((currentRot + 90) % 360));
         const updatedBytes = await pdfDoc.save();
-        await loadPdfBuffer(new Uint8Array(updatedBytes), fileName || 'Document.pdf');
+        const newBytes = new Uint8Array(updatedBytes);
+
+        lastLoadedBytesRef.current = newBytes;
+        onPdfSaved?.(newBytes, fileName || 'Document.pdf');
+        setPdfBytes(newBytes);
+
+        // Invalidate text extraction on this page so it re-extracts with the new orientation
+        setExtractedPages((prev) => {
+          const next = { ...prev };
+          delete next[targetIndex];
+          return next;
+        });
+
+        // Remove old text items for this page
+        setTextItems((prev) => prev.filter((item) => item.pageIndex !== targetIndex));
+
+        // Rotate shapes on this page so they align with the rotated orientation
+        setShapes((prev) =>
+          prev.map((s) => {
+            if (s.pageIndex !== targetIndex) return s;
+            const newX = pageDims.height - (s.y + s.height);
+            const newY = s.x;
+            return {
+              ...s,
+              x: Math.max(0, newX),
+              y: Math.max(0, newY),
+              width: s.height,
+              height: s.width,
+              rotation: ((s.rotation || 0) + 90) % 360,
+            };
+          })
+        );
+
+        setCurrentPage(targetPageNum);
+        await updateSinglePageThumbnail(newBytes, targetPageNum);
+
         setStatusBanner({
           type: 'success',
           message: `Rotated Page ${targetPageNum} by 90°!`,
@@ -799,18 +882,71 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     }
   };
 
-  // Delete a specific page from the document directly from the thumbnail rail
+  // Delete a specific page from the document directly from thumbnail rail or toolbar
   const handleDeletePage = async (targetPageNum: number) => {
     if (!pdfBytes || pageCount <= 1) return;
-    if (!window.confirm(`Are you sure you want to delete Page ${targetPageNum}?`)) return;
+    if (!window.confirm(`Are you sure you want to delete Page ${targetPageNum}? This action cannot be undone.`)) return;
     try {
       setIsRendering(true);
       const pdfDoc = await PDFDocument.load(pdfBytes.slice(0), { ignoreEncryption: true });
-      pdfDoc.removePage(targetPageNum - 1);
+      const targetIndex = targetPageNum - 1;
+      pdfDoc.removePage(targetIndex);
       const updatedBytes = await pdfDoc.save();
-      const nextTargetPage = Math.min(currentPage, pageCount - 1);
-      await loadPdfBuffer(new Uint8Array(updatedBytes), fileName || 'Document.pdf');
+      const newBytes = new Uint8Array(updatedBytes);
+      const newTotal = pageCount - 1;
+
+      lastLoadedBytesRef.current = newBytes;
+      onPdfSaved?.(newBytes, fileName || 'Document.pdf');
+
+      // Shift text items: remove target page items, and decrement higher pageIndices
+      setTextItems((prev) =>
+        prev
+          .filter((item) => item.pageIndex !== targetIndex)
+          .map((item) => {
+            if (item.pageIndex > targetIndex) {
+              return { ...item, pageIndex: item.pageIndex - 1 };
+            }
+            return item;
+          })
+      );
+
+      // Shift shapes: remove target page shapes, and decrement higher pageIndices
+      setShapes((prev) =>
+        prev
+          .filter((s) => s.pageIndex !== targetIndex)
+          .map((s) => {
+            if (s.pageIndex > targetIndex) {
+              return { ...s, pageIndex: s.pageIndex - 1 };
+            }
+            return s;
+          })
+      );
+
+      // Shift extractedPages record
+      setExtractedPages((prev) => {
+        const next: Record<number, boolean> = {};
+        for (const [key, val] of Object.entries(prev)) {
+          const idx = Number(key);
+          if (idx < targetIndex) {
+            next[idx] = val;
+          } else if (idx > targetIndex) {
+            next[idx - 1] = val;
+          }
+        }
+        return next;
+      });
+
+      setPdfBytes(newBytes);
+      setPageCount(newTotal);
+
+      const nextTargetPage = Math.min(
+        currentPage > targetPageNum ? currentPage - 1 : currentPage,
+        newTotal
+      );
       setCurrentPage(Math.max(1, nextTargetPage));
+
+      generateThumbnails(newBytes, newTotal);
+
       setStatusBanner({
         type: 'success',
         message: `Deleted Page ${targetPageNum} successfully!`,
@@ -827,7 +963,12 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
 
   // Sync initial PDF bytes from parent if provided (e.g. from PdfMultiTool)
   useEffect(() => {
-    if (initialPdfBytes && initialPdfBytes.length > 0 && pdfBytes !== initialPdfBytes) {
+    if (
+      initialPdfBytes &&
+      initialPdfBytes.length > 0 &&
+      initialPdfBytes !== lastLoadedBytesRef.current
+    ) {
+      lastLoadedBytesRef.current = initialPdfBytes;
       loadPdfBuffer(initialPdfBytes, initialFileName || 'Document.pdf');
     }
   }, [initialPdfBytes, initialFileName]);
@@ -838,15 +979,240 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     await loadPdfBuffer(new Uint8Array(buf), file.name);
   };
 
+  // Helper to extract text runs and items from a pdf page with optional canvas color sampling
+  const extractItemsFromPage = async (
+    page: any,
+    pageIdx: number,
+    baseViewport: any,
+    ctx?: CanvasRenderingContext2D,
+    canvasW?: number,
+    canvasH?: number,
+    renderScale = 2.0
+  ): Promise<EditablePdfTextItem[]> => {
+    const textContent = await page.getTextContent();
+    const styles = textContent.styles as Record<string, { fontFamily?: string }>;
+
+    interface RawRun {
+      str: string;
+      x: number;
+      baselineY: number;
+      topY: number;
+      width: number;
+      height: number;
+      fontSize: number;
+      fontName: string;
+      exactFontName: string;
+      family: PdfFontFamily;
+      bold: boolean;
+      italic: boolean;
+    }
+
+    const rawRuns: RawRun[] = [];
+
+    for (const item of textContent.items) {
+      if (!('str' in item) || !item.str || !item.str.trim()) continue;
+      const tx = pdfjsLib.Util.transform(baseViewport.transform, item.transform);
+      const fontSize = Math.round(Math.hypot(tx[2], tx[3]) * 100) / 100;
+      if (fontSize < 3 || fontSize > 160) continue;
+
+      const x = tx[4];
+      const baselineY = tx[5];
+      const width = Math.max(fontSize * 0.4, item.width);
+      const height = fontSize * 1.12;
+      const topY = baselineY - fontSize * 0.84;
+
+      const styleObj = styles[item.fontName] || {};
+      let fontHint = styleObj.fontFamily || '';
+      let resolvedFontName = item.fontName || '';
+      try {
+        if ((page as any).commonObjs && (page as any).commonObjs.has(item.fontName)) {
+          const fObj = (page as any).commonObjs.get(item.fontName);
+          if (fObj) {
+            resolvedFontName = fObj.name || fObj.fallbackName || fObj.loadedName || resolvedFontName;
+          }
+        }
+      } catch {
+        // ignore
+      }
+
+      const { cleanName, family, bold, italic } = detectFontMetadata(
+        resolvedFontName,
+        fontHint
+      );
+
+      rawRuns.push({
+        str: item.str,
+        x,
+        baselineY,
+        topY,
+        width,
+        height,
+        fontSize,
+        fontName: resolvedFontName,
+        exactFontName: cleanName,
+        family,
+        bold,
+        italic,
+      });
+    }
+
+    // Sort top-to-bottom, then left-to-right
+    rawRuns.sort((a, b) => {
+      if (Math.abs(a.baselineY - b.baselineY) > 2.5) {
+        return a.baselineY - b.baselineY;
+      }
+      return a.x - b.x;
+    });
+
+    // Smartly merge adjacent words on the same line that share the same font & size
+    const mergedRuns: RawRun[] = [];
+    for (const run of rawRuns) {
+      const prev = mergedRuns[mergedRuns.length - 1];
+      if (
+        prev &&
+        Math.abs(prev.baselineY - run.baselineY) <= 2.2 &&
+        Math.abs(prev.fontSize - run.fontSize) <= 0.8 &&
+        prev.family === run.family &&
+        prev.bold === run.bold &&
+        prev.italic === run.italic
+      ) {
+        const gap = run.x - (prev.x + prev.width);
+        if (gap >= -3 && gap <= prev.fontSize * 0.9) {
+          const needsSpace =
+            gap > prev.fontSize * 0.16 &&
+            !prev.str.endsWith(' ') &&
+            !run.str.startsWith(' ');
+          prev.str = `${prev.str}${needsSpace ? ' ' : ''}${run.str}`;
+          prev.width = Math.max(prev.width, run.x + run.width - prev.x);
+          continue;
+        }
+      }
+      mergedRuns.push({ ...run });
+    }
+
+    // Convert merged runs into EditablePdfTextItem
+    return mergedRuns.map((r, idx) => {
+      let bgColor = '#ffffff';
+      let textColor = '#0f172a';
+
+      if (ctx && canvasW && canvasH) {
+        const sampled = sampleColorsFromCanvas(
+          ctx,
+          canvasW,
+          canvasH,
+          r.x * renderScale,
+          r.topY * renderScale,
+          r.width * renderScale,
+          r.height * renderScale
+        );
+        bgColor = sampled.bgColor;
+        textColor = sampled.textColor;
+      }
+
+      return {
+        id: `p${pageIdx}-t${idx}-${Math.random().toString(36).slice(2, 7)}`,
+        pageIndex: pageIdx,
+        origX: r.x,
+        origBaselineY: r.baselineY,
+        origTopY: r.topY,
+        origWidth: r.width,
+        origHeight: r.height,
+        origText: r.str,
+        origFontSize: r.fontSize,
+        x: r.x,
+        baselineY: r.baselineY,
+        topY: r.topY,
+        width: Math.max(r.width + 6, r.fontSize * 1.5),
+        height: r.height,
+        text: r.str,
+        fontSize: r.fontSize,
+        fontName: r.fontName,
+        exactFontName: r.exactFontName,
+        fontFamily: r.family,
+        bold: r.bold,
+        italic: r.italic,
+        textColor,
+        bgColor,
+        isNew: false,
+        isDeleted: false,
+      };
+    });
+  };
+
+  // Extract text items across all pages in document for global Search & Replace
+  const ensureAllPagesExtracted = async (): Promise<EditablePdfTextItem[]> => {
+    if (!pdfBytes) return textItems;
+    try {
+      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
+      const pdf = await loadingTask.promise;
+      let allItems = [...textItems];
+      const newlyExtracted = { ...extractedPages };
+
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const pageIdx = p - 1;
+        if (newlyExtracted[pageIdx]) continue;
+
+        const page = await pdf.getPage(p);
+        const baseViewport = page.getViewport({ scale: 1.0 });
+
+        // Offscreen canvas for accurate color sampling
+        const renderScale = 1.5;
+        const renderViewport = page.getViewport({ scale: renderScale });
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = renderViewport.width;
+        offCanvas.height = renderViewport.height;
+        const offCtx = offCanvas.getContext('2d');
+        if (offCtx) {
+          try {
+            await page.render({ canvasContext: offCtx, viewport: renderViewport }).promise;
+          } catch {
+            // ignore
+          }
+        }
+
+        const pageItems = await extractItemsFromPage(
+          page,
+          pageIdx,
+          baseViewport,
+          offCtx || undefined,
+          offCanvas.width,
+          offCanvas.height,
+          renderScale
+        );
+
+        allItems = [...allItems.filter((it) => it.pageIndex !== pageIdx), ...pageItems];
+        newlyExtracted[pageIdx] = true;
+      }
+
+      setExtractedPages(newlyExtracted);
+      setTextItems(allItems);
+      return allItems;
+    } catch (err) {
+      console.warn('Failed to extract all pages:', err);
+      return textItems;
+    }
+  };
+
   // Render current page bitmap & extract exact text items with constant font size, font family, and sampled colors
   const renderPageAndExtractText = useCallback(async () => {
     if (!pdfBytes || !bgCanvasRef.current) return;
     setIsRendering(true);
+
+    if (activeRenderTaskRef.current) {
+      try {
+        activeRenderTaskRef.current.cancel();
+      } catch {
+        // ignore
+      }
+      activeRenderTaskRef.current = null;
+    }
+
     try {
       const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
       const pdf = await loadingTask.promise;
-      const pageIdx = currentPage - 1;
-      const page = await pdf.getPage(currentPage);
+      const safePageNum = Math.min(Math.max(1, currentPage), pdf.numPages);
+      const pageIdx = safePageNum - 1;
+      const page = await pdf.getPage(safePageNum);
 
       const baseViewport = page.getViewport({ scale: 1.0 });
       setPageDims({ width: baseViewport.width, height: baseViewport.height });
@@ -858,162 +1224,41 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       const renderScale = 2.0;
       const renderViewport = page.getViewport({ scale: renderScale });
       const canvas = bgCanvasRef.current;
+      if (!canvas) return;
       canvas.width = renderViewport.width;
       canvas.height = renderViewport.height;
       const ctx = canvas.getContext('2d')!;
 
-      await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
+      const renderTask = page.render({ canvasContext: ctx, viewport: renderViewport });
+      activeRenderTaskRef.current = renderTask;
+
+      try {
+        await renderTask.promise;
+      } catch (renderErr: any) {
+        if (renderErr?.name === 'RenderingCancelledException') {
+          return;
+        }
+      } finally {
+        activeRenderTaskRef.current = null;
+      }
 
       // Extract text items once per page
       if (!extractedPages[pageIdx]) {
-        const textContent = await page.getTextContent();
-        const styles = textContent.styles as Record<string, { fontFamily?: string }>;
-
-        interface RawRun {
-          str: string;
-          x: number;
-          baselineY: number;
-          topY: number;
-          width: number;
-          height: number;
-          fontSize: number;
-          fontName: string;
-          exactFontName: string;
-          family: PdfFontFamily;
-          bold: boolean;
-          italic: boolean;
-        }
-
-        const rawRuns: RawRun[] = [];
-
-        for (const item of textContent.items) {
-          if (!('str' in item) || !item.str || !item.str.trim()) continue;
-          const tx = pdfjsLib.Util.transform(baseViewport.transform, item.transform);
-          const fontSize = Math.round(Math.hypot(tx[2], tx[3]) * 100) / 100;
-          if (fontSize < 3 || fontSize > 160) continue;
-
-          const x = tx[4];
-          const baselineY = tx[5];
-          const width = Math.max(fontSize * 0.4, item.width);
-          const height = fontSize * 1.12;
-          const topY = baselineY - fontSize * 0.84;
-
-          const styleObj = styles[item.fontName] || {};
-          let fontHint = styleObj.fontFamily || '';
-          let resolvedFontName = item.fontName || '';
-          try {
-            if ((page as any).commonObjs && (page as any).commonObjs.has(item.fontName)) {
-              const fObj = (page as any).commonObjs.get(item.fontName);
-              if (fObj) {
-                resolvedFontName = fObj.name || fObj.fallbackName || fObj.loadedName || resolvedFontName;
-              }
-            }
-          } catch {
-            // ignore
-          }
-
-          const { cleanName, family, bold, italic } = detectFontMetadata(
-            resolvedFontName,
-            fontHint
-          );
-
-          rawRuns.push({
-            str: item.str,
-            x,
-            baselineY,
-            topY,
-            width,
-            height,
-            fontSize,
-            fontName: resolvedFontName,
-            exactFontName: cleanName,
-            family,
-            bold,
-            italic,
-          });
-        }
-
-        // Sort top-to-bottom, then left-to-right
-        rawRuns.sort((a, b) => {
-          if (Math.abs(a.baselineY - b.baselineY) > 2.5) {
-            return a.baselineY - b.baselineY;
-          }
-          return a.x - b.x;
-        });
-
-        // Smartly merge adjacent words on the same line that share the same font & size
-        const mergedRuns: RawRun[] = [];
-        for (const run of rawRuns) {
-          const prev = mergedRuns[mergedRuns.length - 1];
-          if (
-            prev &&
-            Math.abs(prev.baselineY - run.baselineY) <= 2.2 &&
-            Math.abs(prev.fontSize - run.fontSize) <= 0.8 &&
-            prev.family === run.family &&
-            prev.bold === run.bold &&
-            prev.italic === run.italic
-          ) {
-            const gap = run.x - (prev.x + prev.width);
-            if (gap >= -3 && gap <= prev.fontSize * 0.9) {
-              const needsSpace =
-                gap > prev.fontSize * 0.16 &&
-                !prev.str.endsWith(' ') &&
-                !run.str.startsWith(' ');
-              prev.str = `${prev.str}${needsSpace ? ' ' : ''}${run.str}`;
-              prev.width = Math.max(prev.width, run.x + run.width - prev.x);
-              continue;
-            }
-          }
-          mergedRuns.push({ ...run });
-        }
-
-        // Convert merged runs into EditablePdfTextItem with sampled canvas colors
-        const pageItems: EditablePdfTextItem[] = mergedRuns.map((r, idx) => {
-          const { bgColor, textColor } = sampleColorsFromCanvas(
-            ctx,
-            canvas.width,
-            canvas.height,
-            r.x * renderScale,
-            r.topY * renderScale,
-            r.width * renderScale,
-            r.height * renderScale
-          );
-
-          return {
-            id: `p${pageIdx}-t${idx}-${Math.random().toString(36).slice(2, 7)}`,
-            pageIndex: pageIdx,
-            origX: r.x,
-            origBaselineY: r.baselineY,
-            origTopY: r.topY,
-            origWidth: r.width,
-            origHeight: r.height,
-            origText: r.str,
-            origFontSize: r.fontSize,
-            x: r.x,
-            baselineY: r.baselineY,
-            topY: r.topY,
-            width: Math.max(r.width + 6, r.fontSize * 1.5),
-            height: r.height,
-            text: r.str,
-            fontSize: r.fontSize,
-            fontName: r.fontName,
-            exactFontName: r.exactFontName,
-            fontFamily: r.family,
-            bold: r.bold,
-            italic: r.italic,
-            textColor,
-            bgColor,
-            isNew: false,
-            isDeleted: false,
-          };
-        });
+        const pageItems = await extractItemsFromPage(
+          page,
+          pageIdx,
+          baseViewport,
+          ctx,
+          canvas.width,
+          canvas.height,
+          renderScale
+        );
 
         setTextItems((prev) => {
           const next = [
             ...prev.filter((item) => item.pageIndex !== pageIdx),
             ...pageItems,
           ];
-          // Record initial snapshot if empty
           if (historyIndex === -1) {
             setHistory([{ textItems: next, shapes: [] }]);
             setHistoryIndex(0);
@@ -1022,16 +1267,23 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         });
         setExtractedPages((prev) => ({ ...prev, [pageIdx]: true }));
       }
-    } catch {
-      // ignore render cancellation
+    } catch (err) {
+      console.warn('Page render or extraction issue:', err);
     } finally {
       setIsRendering(false);
     }
-  }, [pdfBytes, currentPage, extractedPages, historyIndex]);
+  }, [pdfBytes, currentPage, extractedPages, historyIndex, pageCount]);
 
   useEffect(() => {
     renderPageAndExtractText();
   }, [renderPageAndExtractText]);
+
+  // Pre-extract all pages when Find & Replace is opened in "All Pages" mode
+  useEffect(() => {
+    if (replaceModalOpen && replaceScope === 'all') {
+      ensureAllPagesExtracted();
+    }
+  }, [replaceModalOpen, replaceScope]);
 
   // Update a specific text item's property and optionally commit to history
   const updateTextItem = (
@@ -1054,6 +1306,21 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       });
       if (recordHistory) {
         pushHistory(next, shapes);
+      }
+      return next;
+    });
+  };
+
+  // Update a specific shape's property and optionally commit to history
+  const updateShape = (
+    id: string,
+    patch: Partial<PdfAnnotationShape>,
+    recordHistory = false
+  ) => {
+    setShapes((prev) => {
+      const next = prev.map((s) => (s.id === id ? { ...s, ...patch } : s));
+      if (recordHistory) {
+        pushHistory(textItems, next);
       }
       return next;
     });
@@ -1117,6 +1384,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         height: 26,
         color: '#ffffff',
         opacity: 1,
+        rotation: 0,
       };
       const nextShapes = [...shapes, newShape];
       setShapes(nextShapes);
@@ -1135,6 +1403,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         height: 20,
         color: '#fde047',
         opacity: 0.42,
+        rotation: 0,
       };
       const nextShapes = [...shapes, newShape];
       setShapes(nextShapes);
@@ -1147,12 +1416,132 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     }
   };
 
+  // 8-point resize handle descriptors for shapes (corners + edges)
+  const shapeResizeHandles: Array<{
+    handle: 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w';
+    className: string;
+    title: string;
+  }> = [
+    { handle: 'nw', className: '-top-1.5 -left-1.5 cursor-nwse-resize', title: 'Resize Top-Left' },
+    { handle: 'n', className: '-top-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize', title: 'Resize Top' },
+    { handle: 'ne', className: '-top-1.5 -right-1.5 cursor-nesw-resize', title: 'Resize Top-Right' },
+    { handle: 'e', className: 'top-1/2 -right-1.5 -translate-y-1/2 cursor-ew-resize', title: 'Resize Right' },
+    { handle: 'se', className: '-bottom-1.5 -right-1.5 cursor-nwse-resize', title: 'Resize Bottom-Right' },
+    { handle: 's', className: '-bottom-1.5 left-1/2 -translate-x-1/2 cursor-ns-resize', title: 'Resize Bottom' },
+    { handle: 'sw', className: '-bottom-1.5 -left-1.5 cursor-nesw-resize', title: 'Resize Bottom-Left' },
+    { handle: 'w', className: 'top-1/2 -left-1.5 -translate-y-1/2 cursor-ew-resize', title: 'Resize Left' },
+  ];
+
+  const handleShapeResizeStart = (
+    e: React.MouseEvent,
+    shape: PdfAnnotationShape,
+    handle: 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w'
+  ) => {
+    e.stopPropagation();
+    if (!pageContainerRef.current) return;
+    const rect = pageContainerRef.current.getBoundingClientRect();
+    setResizingShapeHandle({
+      id: shape.id,
+      handle,
+      startX: (e.clientX - rect.left) / zoom,
+      startY: (e.clientY - rect.top) / zoom,
+      startShapeX: shape.x,
+      startShapeY: shape.y,
+      startWidth: shape.width,
+      startHeight: shape.height,
+    });
+  };
+
+  const handleShapeRotateStart = (e: React.MouseEvent, shape: PdfAnnotationShape) => {
+    e.stopPropagation();
+    const centerX = shape.x + shape.width / 2;
+    const centerY = shape.y + shape.height / 2;
+    setRotatingShape({
+      id: shape.id,
+      centerX,
+      centerY,
+      initialRotation: shape.rotation || 0,
+    });
+  };
+
   // Drag & Resize mouse move handlers
   const handleMouseMoveOnPage = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!pageContainerRef.current) return;
     const rect = pageContainerRef.current.getBoundingClientRect();
     const curX = (e.clientX - rect.left) / zoom;
     const curY = (e.clientY - rect.top) / zoom;
+
+    // Handle shape rotation
+    if (rotatingShape) {
+      const deltaX = curX - rotatingShape.centerX;
+      const deltaY = curY - rotatingShape.centerY;
+      let rad = Math.atan2(deltaY, deltaX);
+      let deg = (rad * 180) / Math.PI;
+      // Offset by +90 because handle is at top
+      let angle = Math.round(deg + 90);
+      if (angle < 0) angle += 360;
+      angle = angle % 360;
+
+      // Snap within 5 degrees of cardinal angles (0, 90, 180, 270)
+      for (const snap of [0, 90, 180, 270, 360]) {
+        if (Math.abs(angle - snap) < 6) {
+          angle = snap % 360;
+          break;
+        }
+      }
+
+      setShapes((prev) =>
+        prev.map((s) => (s.id === rotatingShape.id ? { ...s, rotation: angle } : s))
+      );
+      return;
+    }
+
+    // Handle shape 8-point resize
+    if (resizingShapeHandle) {
+      const deltaX = curX - resizingShapeHandle.startX;
+      const deltaY = curY - resizingShapeHandle.startY;
+      const { id, handle, startShapeX, startShapeY, startWidth, startHeight } = resizingShapeHandle;
+
+      let nextX = startShapeX;
+      let nextY = startShapeY;
+      let nextW = startWidth;
+      let nextH = startHeight;
+
+      if (handle === 'e') {
+        nextW = Math.max(16, startWidth + deltaX);
+      } else if (handle === 'w') {
+        nextW = Math.max(16, startWidth - deltaX);
+        nextX = startShapeX + (startWidth - nextW);
+      } else if (handle === 's') {
+        nextH = Math.max(12, startHeight + deltaY);
+      } else if (handle === 'n') {
+        nextH = Math.max(12, startHeight - deltaY);
+        nextY = startShapeY + (startHeight - nextH);
+      } else if (handle === 'se') {
+        nextW = Math.max(16, startWidth + deltaX);
+        nextH = Math.max(12, startHeight + deltaY);
+      } else if (handle === 'sw') {
+        nextW = Math.max(16, startWidth - deltaX);
+        nextH = Math.max(12, startHeight + deltaY);
+        nextX = startShapeX + (startWidth - nextW);
+      } else if (handle === 'ne') {
+        nextW = Math.max(16, startWidth + deltaX);
+        nextH = Math.max(12, startHeight - deltaY);
+        nextY = startShapeY + (startHeight - nextH);
+      } else if (handle === 'nw') {
+        nextW = Math.max(16, startWidth - deltaX);
+        nextH = Math.max(12, startHeight - deltaY);
+        nextX = startShapeX + (startWidth - nextW);
+        nextY = startShapeY + (startHeight - nextH);
+      }
+
+      setShapes((prev) =>
+        prev.map((s) =>
+          s.id === id ? { ...s, x: nextX, y: nextY, width: nextW, height: nextH } : s
+        )
+      );
+      return;
+    }
 
     // Handle 8-point resizing of text block
     if (resizingHandle) {
@@ -1168,7 +1557,6 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         const nextX = resizingHandle.startXPos + deltaX;
         updateTextItem(resizingHandle.id, { width: nextW, x: nextX });
       } else if (resizingHandle.handle === 'se' || resizingHandle.handle === 'ne') {
-        // Corner scale: adjusts font size dynamically!
         const scale = Math.max(0.4, (resizingHandle.startWidth + deltaX) / resizingHandle.startWidth);
         const nextFontSize = Math.max(6, Math.min(96, Math.round(resizingHandle.startFontSize * scale * 2) / 2));
         const nextW = Math.max(24, resizingHandle.startWidth * scale);
@@ -1199,10 +1587,12 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   };
 
   const handleMouseUpOnPage = () => {
-    if (draggingId || resizingHandle) {
+    if (draggingId || resizingHandle || resizingShapeHandle || rotatingShape) {
       pushHistory(textItems, shapes);
       setDraggingId(null);
       setResizingHandle(null);
+      setResizingShapeHandle(null);
+      setRotatingShape(null);
     }
   };
 
@@ -1216,10 +1606,16 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       : t.text.toLowerCase().includes(findQuery.toLowerCase());
   });
 
-  const handleReplaceAll = () => {
+  const handleReplaceAll = async () => {
     if (!findQuery.trim()) return;
+
+    let sourceItems = textItems;
+    if (replaceScope === 'all') {
+      sourceItems = await ensureAllPagesExtracted();
+    }
+
     let count = 0;
-    const nextItems = textItems.map((item) => {
+    const nextItems = sourceItems.map((item) => {
       if (replaceScope === 'current' && item.pageIndex !== currentPage - 1) return item;
       if (item.isDeleted) return item;
 
@@ -1250,7 +1646,9 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     setReplaceModalOpen(false);
     setStatusBanner({
       type: 'success',
-      message: `Replaced ${count} occurrence${count === 1 ? '' : 's'} of "${findQuery}" with "${replaceQuery}"!`,
+      message: `Replaced ${count} occurrence${count === 1 ? '' : 's'} across ${
+        replaceScope === 'all' ? `all ${pageCount} pages` : `Page ${currentPage}`
+      }!`,
     });
   };
 
@@ -1270,6 +1668,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         height: 90,
         color: '#ffffff',
         opacity: 1,
+        rotation: 0,
         imageDataUrl: reader.result as string,
       };
       const nextShapes = [...shapes, newShape];
@@ -1309,6 +1708,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       height: 52,
       color: '#0f172a',
       opacity: 1,
+      rotation: 0,
       imageDataUrl: dataUrl,
     };
     const nextShapes = [...shapes, newShape];
@@ -1331,6 +1731,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       height: 60,
       color: stampColor,
       opacity: 0.95,
+      rotation: 0,
       imageDataUrl: dataUrl,
     };
     const nextShapes = [...shapes, newShape];
@@ -1573,13 +1974,19 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
           const sy = shape.y * exportScale;
           const sw = shape.width * exportScale;
           const sh = shape.height * exportScale;
+          const centerX = sx + sw / 2;
+          const centerY = sy + sh / 2;
+
+          ctx.save();
+          ctx.globalAlpha = shape.opacity;
+          ctx.translate(centerX, centerY);
+          if (shape.rotation) {
+            ctx.rotate((shape.rotation * Math.PI) / 180);
+          }
 
           if (shape.kind === 'whiteout' || shape.kind === 'highlight') {
-            ctx.save();
-            ctx.globalAlpha = shape.opacity;
             ctx.fillStyle = shape.color;
-            ctx.fillRect(sx, sy, sw, sh);
-            ctx.restore();
+            ctx.fillRect(-sw / 2, -sh / 2, sw, sh);
           } else if (
             (shape.kind === 'image' || shape.kind === 'signature' || shape.kind === 'stamp') &&
             shape.imageDataUrl
@@ -1587,16 +1994,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
             await new Promise<void>((resolve) => {
               const img = new Image();
               img.onload = () => {
-                ctx.save();
-                ctx.globalAlpha = shape.opacity;
-                ctx.drawImage(img, sx, sy, sw, sh);
-                ctx.restore();
+                ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
                 resolve();
               };
               img.onerror = () => resolve();
               img.src = shape.imageDataUrl!;
             });
           }
+          ctx.restore();
         }
 
         // 4. Draw Watermark if enabled
@@ -2027,6 +2432,30 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                   </button>
                 </div>
 
+                {/* Direct Page Rotation & Deletion Controls */}
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleRotatePage(currentPage)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-indigo-500/50 text-xs font-semibold cursor-pointer transition"
+                    title="Rotate current page 90° clockwise"
+                  >
+                    <RotateCw className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="hidden xl:inline">Rotate</span>
+                  </button>
+                  {pageCount > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleDeletePage(currentPage)}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 text-xs font-semibold cursor-pointer transition"
+                      title="Delete current page"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <span className="hidden xl:inline">Delete</span>
+                    </button>
+                  )}
+                </div>
+
                 {/* Undo / Redo */}
                 <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
                   <button
@@ -2429,15 +2858,17 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                       top: `${shape.y * zoom}px`,
                       width: `${shape.width * zoom}px`,
                       height: `${shape.height * zoom}px`,
+                      transform: `rotate(${shape.rotation || 0}deg)`,
+                      transformOrigin: 'center center',
                       backgroundColor:
                         shape.kind === 'whiteout' || shape.kind === 'highlight'
                           ? shape.color
                           : 'transparent',
                       opacity: shape.opacity,
                     }}
-                    className={`cursor-move ${
+                    className={`cursor-move select-none ${
                       isSelected
-                        ? 'ring-2 ring-indigo-500 z-20 shadow-md'
+                        ? 'ring-2 ring-indigo-500 z-30 shadow-xl'
                         : 'hover:ring-1 hover:ring-indigo-400/70 z-10'
                     }`}
                   >
@@ -2445,26 +2876,120 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                       <img
                         src={shape.imageDataUrl}
                         alt={shape.kind}
-                        className="w-full h-full object-contain pointer-events-none"
+                        className="w-full h-full object-contain pointer-events-none select-none"
+                        draggable={false}
                       />
                     )}
 
+                    {/* Interactive Handles & Controls when Selected */}
                     {isSelected && (
-                      <div className="absolute -top-7 right-0 flex items-center gap-1 bg-slate-900 border border-slate-700 rounded-md px-1.5 py-0.5 shadow-lg">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const next = shapes.filter((s) => s.id !== shape.id);
-                            setShapes(next);
-                            pushHistory(textItems, next);
-                            setSelectedShapeId(null);
-                          }}
-                          className="text-rose-400 hover:text-rose-300 p-0.5 cursor-pointer"
-                          title="Delete annotation"
+                      <>
+                        {/* 1. Floating Action Toolbar */}
+                        <div
+                          className="absolute -top-12 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-lg px-2 py-1 shadow-2xl z-40 whitespace-nowrap text-xs pointer-events-auto"
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
                         >
-                          <Trash2 className="w-3 h-3" />
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newRot = ((shape.rotation || 0) - 90 + 360) % 360;
+                              updateShape(shape.id, { rotation: newRot }, true);
+                            }}
+                            className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+                            title="Rotate -90°"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newRot = ((shape.rotation || 0) + 90) % 360;
+                              updateShape(shape.id, { rotation: newRot }, true);
+                            }}
+                            className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+                            title="Rotate +90°"
+                          >
+                            <RotateCw className="w-3.5 h-3.5" />
+                          </button>
+                          {shape.rotation ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                updateShape(shape.id, { rotation: 0 }, true);
+                              }}
+                              className="px-1.5 py-0.5 rounded text-[10px] bg-indigo-950 border border-indigo-500/40 text-indigo-300 font-bold hover:bg-indigo-900 cursor-pointer transition"
+                              title="Reset rotation to 0°"
+                            >
+                              {shape.rotation}° (Reset)
+                            </button>
+                          ) : null}
+                          <div className="w-[1px] h-3.5 bg-slate-700 mx-0.5" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const dup: PdfAnnotationShape = {
+                                ...shape,
+                                id: `${shape.kind}-${Date.now()}`,
+                                x: shape.x + 15,
+                                y: shape.y + 15,
+                              };
+                              const next = [...shapes, dup];
+                              setShapes(next);
+                              pushHistory(textItems, next);
+                              setSelectedShapeId(dup.id);
+                            }}
+                            className="p-1 rounded text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition"
+                            title="Duplicate"
+                          >
+                            <Copy className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const next = shapes.filter((s) => s.id !== shape.id);
+                              setShapes(next);
+                              pushHistory(textItems, next);
+                              setSelectedShapeId(null);
+                            }}
+                            className="p-1 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-950/50 cursor-pointer transition"
+                            title="Delete annotation"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {/* 2. Top Rotation Handle with Stem */}
+                        <div
+                          className="absolute left-1/2 -top-5 -translate-x-1/2 flex flex-col items-center z-40 pointer-events-auto"
+                          onMouseDown={(e) => handleShapeRotateStart(e, shape)}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div
+                            className="w-4 h-4 rounded-full bg-white border-2 border-indigo-600 shadow-md flex items-center justify-center cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                            title="Drag to rotate shape freely"
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
+                          </div>
+                          <div className="w-[1.5px] h-2 bg-indigo-500" />
+                        </div>
+
+                        {/* 3. 8 Resize Handles (Corners & Edges) */}
+                        {shapeResizeHandles.map((h) => (
+                          <div
+                            key={h.handle}
+                            onMouseDown={(e) => handleShapeResizeStart(e, shape, h.handle)}
+                            onClick={(e) => e.stopPropagation()}
+                            className={`absolute w-2.5 h-2.5 bg-white border-2 border-indigo-600 rounded-xs shadow-xs z-40 pointer-events-auto ${h.className} hover:scale-130 transition-transform`}
+                            title={h.title}
+                          />
+                        ))}
+                      </>
                     )}
                   </div>
                 );
@@ -2980,18 +3505,21 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                     onClick={() => setReplaceScope('current')}
                     className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
                       replaceScope === 'current'
-                        ? 'bg-amber-400 text-slate-950'
-                        : 'bg-slate-950 text-slate-400 border border-slate-800'
+                        ? 'bg-amber-400 text-slate-950 font-bold'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
                     }`}
                   >
                     Current Page ({currentPage})
                   </button>
                   <button
-                    onClick={() => setReplaceScope('all')}
+                    onClick={() => {
+                      setReplaceScope('all');
+                      ensureAllPagesExtracted();
+                    }}
                     className={`px-2.5 py-1 rounded-lg text-xs font-semibold cursor-pointer ${
                       replaceScope === 'all'
-                        ? 'bg-amber-400 text-slate-950'
-                        : 'bg-slate-950 text-slate-400 border border-slate-800'
+                        ? 'bg-amber-400 text-slate-950 font-bold'
+                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
                     }`}
                   >
                     All Pages ({pageCount})
