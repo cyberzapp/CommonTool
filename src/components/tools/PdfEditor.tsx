@@ -219,19 +219,24 @@ function detectFontMetadata(
     .replace(/MT$/i, '')
     .trim();
 
+  // If cleanName is empty, use hint
+  if (!cleanName && hint) {
+    cleanName = hint;
+  }
+
   let family: PdfFontFamily = 'sans';
 
   if (combined.includes('calibri') || combined.includes('carlito')) {
-    cleanName = 'Calibri';
+    cleanName = cleanName || 'Calibri';
     family = 'calibri';
   } else if (combined.includes('times') || combined.includes('timesnewroman')) {
-    cleanName = 'Times New Roman';
+    cleanName = cleanName || 'Times New Roman';
     family = 'times';
   } else if (combined.includes('georgia')) {
-    cleanName = 'Georgia';
+    cleanName = cleanName || 'Georgia';
     family = 'georgia';
   } else if (combined.includes('garamond')) {
-    cleanName = 'Garamond';
+    cleanName = cleanName || 'Garamond';
     family = 'garamond';
   } else if (
     combined.includes('cambria') ||
@@ -239,39 +244,58 @@ function detectFontMetadata(
     combined.includes('baskerville') ||
     (combined.includes('serif') && !combined.includes('sans'))
   ) {
-    cleanName = 'Times New Roman';
+    cleanName = cleanName || 'Times New Roman';
     family = 'times';
   } else if (combined.includes('arial') || combined.includes('arimo')) {
-    cleanName = 'Arial';
+    cleanName = cleanName || 'Arial';
     family = 'arial';
   } else if (combined.includes('helvetica')) {
-    cleanName = 'Helvetica';
+    cleanName = cleanName || 'Helvetica';
     family = 'helvetica';
   } else if (combined.includes('roboto')) {
-    cleanName = 'Roboto';
+    cleanName = cleanName || 'Roboto';
     family = 'roboto';
   } else if (combined.includes('open sans') || combined.includes('opensans')) {
-    cleanName = 'Open Sans';
+    cleanName = cleanName || 'Open Sans';
     family = 'sans';
   } else if (combined.includes('verdana')) {
-    cleanName = 'Verdana';
+    cleanName = cleanName || 'Verdana';
     family = 'verdana';
   } else if (combined.includes('trebuchet')) {
-    cleanName = 'Trebuchet MS';
+    cleanName = cleanName || 'Trebuchet MS';
     family = 'sans';
   } else if (combined.includes('courier')) {
-    cleanName = 'Courier New';
+    cleanName = cleanName || 'Courier New';
     family = 'courier';
   } else if (
     combined.includes('consolas') ||
     combined.includes('menlo') ||
     combined.includes('mono')
   ) {
-    cleanName = 'Consolas';
+    cleanName = cleanName || 'Consolas';
     family = 'mono';
-  } else {
-    cleanName = 'Arial';
+  } else if (combined.includes('jio') || combined.includes('jiotype')) {
+    cleanName = 'JioType';
     family = 'sans';
+  } else if (combined.includes('segoe')) {
+    cleanName = 'Segoe UI';
+    family = 'sans';
+  } else if (combined.includes('inter')) {
+    cleanName = 'Inter';
+    family = 'sans';
+  } else if (combined.includes('poppins')) {
+    cleanName = 'Poppins';
+    family = 'sans';
+  } else if (combined.includes('montserrat')) {
+    cleanName = 'Montserrat';
+    family = 'sans';
+  } else if (combined.includes('lato')) {
+    cleanName = 'Lato';
+    family = 'sans';
+  } else {
+    // Preserve the detected font name from the PDF!
+    cleanName = cleanName || 'Arial';
+    family = combined.includes('serif') ? 'serif' : combined.includes('mono') ? 'mono' : 'sans';
   }
 
   return { cleanName, family, bold, italic };
@@ -560,14 +584,20 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
   }, [handleUndo, handleRedo, selectedTextId, selectedShapeId, textItems, shapes, pushHistory]);
 
   const cssFontStack = (family: PdfFontFamily, exactFontName?: string) => {
-    const prefix = exactFontName ? `"${exactFontName}", ` : '';
+    const cleanExact = exactFontName && exactFontName !== 'sans-serif' ? `"${exactFontName}", ` : '';
+    const cleanExactNoSpace =
+      exactFontName && exactFontName.includes(' ')
+        ? `"${exactFontName.replace(/\s+/g, '')}", `
+        : '';
+    const prefix = `${cleanExact}${cleanExactNoSpace}`;
+
     switch (family) {
       case 'calibri':
         return `${prefix}Calibri, "Carlito", "Segoe UI", Arial, sans-serif`;
       case 'arial':
         return `${prefix}Arial, "Helvetica Neue", Helvetica, sans-serif`;
       case 'helvetica':
-        return `${prefix}Helvetica, "Helvetica Neue", Arial, sans-serif`;
+        return `${prefix}"Helvetica Neue", Helvetica, Arial, sans-serif`;
       case 'times':
         return `${prefix}"Times New Roman", Times, "Liberation Serif", Georgia, serif`;
       case 'georgia':
@@ -579,14 +609,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       case 'roboto':
         return `${prefix}Roboto, "Open Sans", Arial, sans-serif`;
       case 'verdana':
-        return `${prefix}Verdana, Tahoma, Arial, sans-serif`;
+        return `${prefix}Verdana, Geneva, Tahoma, Arial, sans-serif`;
       case 'courier':
         return `${prefix}"Courier New", Courier, "Liberation Mono", monospace`;
       case 'mono':
         return `${prefix}Consolas, Menlo, Monaco, "Courier New", monospace`;
       case 'sans':
       default:
-        return `${prefix}-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, Helvetica, sans-serif`;
+        return `${prefix}"JioType", "Jio Type", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, "Helvetica Neue", Arial, sans-serif`;
     }
   };
 
@@ -1273,212 +1303,165 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     await loadPdfBuffer(bytes, 'Sample-Editable-Agreement.pdf');
   };
 
-  // Export the final edited PDF with vector fonts, exact constant font sizes, and seamless background patching
+  // Export the final edited PDF using High-DPI Canvas Compositing (100% immune to encryption & stream corruption)
   const exportEditedPdf = async () => {
     if (!pdfBytes) return;
     setIsExporting(true);
     setStatusBanner(null);
 
     try {
-      const pdfDoc = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+      const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
+      const pdf = await loadingTask.promise;
+      const totalPages = pdf.numPages;
 
-      // Embed standard PDF font families
-      const fontMap = {
-        sans: {
-          regular: await pdfDoc.embedFont(StandardFonts.Helvetica),
-          bold: await pdfDoc.embedFont(StandardFonts.HelveticaBold),
-          italic: await pdfDoc.embedFont(StandardFonts.HelveticaOblique),
-          boldItalic: await pdfDoc.embedFont(StandardFonts.HelveticaBoldOblique),
-        },
-        serif: {
-          regular: await pdfDoc.embedFont(StandardFonts.TimesRoman),
-          bold: await pdfDoc.embedFont(StandardFonts.TimesRomanBold),
-          italic: await pdfDoc.embedFont(StandardFonts.TimesRomanItalic),
-          boldItalic: await pdfDoc.embedFont(StandardFonts.TimesRomanBoldItalic),
-        },
-        mono: {
-          regular: await pdfDoc.embedFont(StandardFonts.Courier),
-          bold: await pdfDoc.embedFont(StandardFonts.CourierBold),
-          italic: await pdfDoc.embedFont(StandardFonts.CourierOblique),
-          boldItalic: await pdfDoc.embedFont(StandardFonts.CourierBoldOblique),
-        },
-      };
+      // Create a fresh, pristine, unencrypted PDF document that opens in every viewer
+      const outPdfDoc = await PDFDocument.create();
 
-      const pickEmbeddedFont = (family: PdfFontFamily, bold: boolean, italic: boolean) => {
-        let group = fontMap.sans;
-        if (
-          family === 'serif' ||
-          family === 'times' ||
-          family === 'georgia' ||
-          family === 'garamond'
-        ) {
-          group = fontMap.serif;
-        } else if (family === 'mono' || family === 'courier') {
-          group = fontMap.mono;
-        }
-        if (bold && italic) return group.boldItalic;
-        if (bold) return group.bold;
-        if (italic) return group.italic;
-        return group.regular;
-      };
+      // High-DPI render scale for crisp print & display quality (2.0 = ~150-200 DPI)
+      const exportScale = 2.0;
 
-      const pages = pdfDoc.getPages();
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        const pageIdx = pageNum - 1;
+        const page = await pdf.getPage(pageNum);
+        const baseViewport = page.getViewport({ scale: 1.0 });
+        const renderViewport = page.getViewport({ scale: exportScale });
 
-      // 1. Apply all modified, deleted, or newly added text items
-      for (const item of textItems) {
-        const pdfPage = pages[item.pageIndex];
-        if (!pdfPage) continue;
-        const { height: pageH } = pdfPage.getSize();
+        // High-DPI offscreen canvas
+        const canvas = document.createElement('canvas');
+        canvas.width = renderViewport.width;
+        canvas.height = renderViewport.height;
+        const ctx = canvas.getContext('2d')!;
 
-        const wasModified =
-          item.isDeleted ||
-          item.isNew ||
-          item.text !== item.origText ||
-          Math.abs(item.x - item.origX) > 0.5 ||
-          Math.abs(item.topY - item.origTopY) > 0.5 ||
-          Math.abs(item.fontSize - item.origFontSize) > 0.2;
+        // 1. Render the full, decrypted original PDF page plate (all vectors, images, logos, and unedited text)
+        await page.render({ canvasContext: ctx, viewport: renderViewport }).promise;
 
-        if (!wasModified) continue;
+        // 2. Apply in-place text edits, deletions, and additions for this page
+        const pageItems = textItems.filter((t) => t.pageIndex === pageIdx);
+        for (const item of pageItems) {
+          const wasModified =
+            item.isDeleted ||
+            item.isNew ||
+            item.text !== item.origText ||
+            Math.abs(item.x - item.origX) > 0.5 ||
+            Math.abs(item.topY - item.origTopY) > 0.5 ||
+            Math.abs(item.fontSize - item.origFontSize) > 0.2;
 
-        // Step A: Cover original PDF glyphs with sampled background color
-        if (!item.isNew) {
-          const bg = hexToRgb01(item.bgColor === 'transparent' ? '#ffffff' : item.bgColor);
-          const origBaselinePdfY = pageH - item.origBaselineY;
-          pdfPage.drawRectangle({
-            x: Math.max(0, item.origX - 1.5),
-            y: origBaselinePdfY - item.origFontSize * 0.25,
-            width: item.origWidth + 3.5,
-            height: item.origFontSize * 1.16,
-            color: rgb(bg.r, bg.g, bg.b),
-          });
-        }
+          if (!wasModified) continue;
 
-        // Step B: Draw new crisp vector text
-        if (!item.isDeleted && item.text.trim().length > 0) {
-          if (
-            item.bgColor &&
-            item.bgColor !== 'transparent' &&
-            (item.isNew ||
-              Math.abs(item.x - item.origX) > 1 ||
-              Math.abs(item.topY - item.origTopY) > 1)
-          ) {
-            const bg = hexToRgb01(item.bgColor);
-            const curBaselinePdfY = pageH - item.baselineY;
-            pdfPage.drawRectangle({
-              x: item.x - 2,
-              y: curBaselinePdfY - item.fontSize * 0.24,
-              width: item.width + 4,
-              height: item.fontSize * 1.15,
-              color: rgb(bg.r, bg.g, bg.b),
-            });
+          // Step 2A: Seamlessly cover original text with sampled background color
+          if (!item.isNew) {
+            ctx.fillStyle = item.bgColor === 'transparent' ? '#ffffff' : item.bgColor;
+            const rx = (item.origX - 1.5) * exportScale;
+            const ry = (item.origBaselineY - item.origFontSize * 0.88) * exportScale;
+            const rw = (item.origWidth + 4) * exportScale;
+            const rh = item.origFontSize * 1.18 * exportScale;
+            ctx.fillRect(rx, ry, rw, rh);
           }
 
-          const font = pickEmbeddedFont(item.fontFamily, item.bold, item.italic);
-          const fg = hexToRgb01(item.textColor);
-          const targetBaselinePdfY = pageH - item.baselineY;
-          const cleanText = sanitizeForStandardFont(item.text);
-          const lines = cleanText.split('\n');
-          let curLineY = targetBaselinePdfY;
-
-          for (const line of lines) {
-            if (line.trim().length > 0) {
-              try {
-                pdfPage.drawText(line, {
-                  x: item.x,
-                  y: curLineY,
-                  size: item.fontSize,
-                  font,
-                  color: rgb(fg.r, fg.g, fg.b),
-                });
-              } catch {
-                try {
-                  pdfPage.drawText(line.replace(/[^\x20-\x7E]/g, ' '), {
-                    x: item.x,
-                    y: curLineY,
-                    size: item.fontSize,
-                    font,
-                    color: rgb(fg.r, fg.g, fg.b),
-                  });
-                } catch {
-                  // Ignore per-item draw error
-                }
-              }
+          // Step 2B: Draw new crisp text with exact font and styling
+          if (!item.isDeleted && item.text.trim().length > 0) {
+            if (
+              item.bgColor &&
+              item.bgColor !== 'transparent' &&
+              (item.isNew ||
+                Math.abs(item.x - item.origX) > 1 ||
+                Math.abs(item.topY - item.origTopY) > 1)
+            ) {
+              ctx.fillStyle = item.bgColor;
+              ctx.fillRect(
+                (item.x - 2) * exportScale,
+                (item.topY - 1) * exportScale,
+                (item.width + 4) * exportScale,
+                (item.height + 2) * exportScale
+              );
             }
-            curLineY -= item.fontSize * 1.18;
+
+            const fontStack = cssFontStack(item.fontFamily, item.exactFontName);
+            const fontWeight = item.bold ? '700' : '400';
+            const fontStyle = item.italic ? 'italic' : 'normal';
+            ctx.font = `${fontStyle} ${fontWeight} ${item.fontSize * exportScale}px ${fontStack}`;
+            ctx.fillStyle = item.textColor;
+            ctx.textBaseline = 'alphabetic';
+
+            const lines = item.text.split('\n');
+            let curBaseline = item.baselineY * exportScale;
+            for (const line of lines) {
+              if (line.trim().length > 0) {
+                ctx.fillText(line, item.x * exportScale, curBaseline);
+              }
+              curBaseline += item.fontSize * 1.18 * exportScale;
+            }
           }
         }
-      }
 
-      // 2. Apply all shapes, whiteouts, highlights, images, and signatures
-      for (const shape of shapes) {
-        const pdfPage = pages[shape.pageIndex];
-        if (!pdfPage) continue;
-        const { height: pageH } = pdfPage.getSize();
-        const pdfY = pageH - shape.y - shape.height;
+        // 3. Draw shapes (whiteouts, highlights, images, stamps, and signatures)
+        const pageShapes = shapes.filter((s) => s.pageIndex === pageIdx);
+        for (const shape of pageShapes) {
+          const sx = shape.x * exportScale;
+          const sy = shape.y * exportScale;
+          const sw = shape.width * exportScale;
+          const sh = shape.height * exportScale;
 
-        if (shape.kind === 'whiteout' || shape.kind === 'highlight') {
-          const c = hexToRgb01(shape.color);
-          pdfPage.drawRectangle({
-            x: shape.x,
-            y: pdfY,
-            width: shape.width,
-            height: shape.height,
-            color: rgb(c.r, c.g, c.b),
-            opacity: shape.opacity,
-          });
-        } else if (
-          (shape.kind === 'image' || shape.kind === 'signature' || shape.kind === 'stamp') &&
-          shape.imageDataUrl
-        ) {
-          const isPng = shape.imageDataUrl.startsWith('data:image/png');
-          const embeddedImg = isPng
-            ? await pdfDoc.embedPng(shape.imageDataUrl)
-            : await pdfDoc.embedJpg(shape.imageDataUrl);
-          pdfPage.drawImage(embeddedImg, {
-            x: shape.x,
-            y: pdfY,
-            width: shape.width,
-            height: shape.height,
-          });
-        }
-      }
-
-      // 3. Apply Watermarks if enabled
-      if (watermarkSettings.enabled && watermarkSettings.text.trim()) {
-        const wmTargetPages =
-          watermarkSettings.applyTo === 'all' ? pages : [pages[currentPage - 1]];
-        const wmFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-        const wmc = hexToRgb01(watermarkSettings.color);
-        for (const wp of wmTargetPages) {
-          if (!wp) continue;
-          const { width: pW, height: pH } = wp.getSize();
-          const cleanWmText = sanitizeForStandardFont(watermarkSettings.text);
-          const textW = wmFont.widthOfTextAtSize(
-            cleanWmText,
-            watermarkSettings.fontSize
-          );
-          const rad = (watermarkSettings.rotation * Math.PI) / 180;
-          try {
-            wp.drawText(cleanWmText, {
-              x: pW / 2 - (textW / 2) * Math.cos(rad),
-              y: pH / 2 - (textW / 2) * Math.sin(rad),
-              size: watermarkSettings.fontSize,
-              font: wmFont,
-              color: rgb(wmc.r, wmc.g, wmc.b),
-              opacity: watermarkSettings.opacity,
-              rotate: degrees(watermarkSettings.rotation),
+          if (shape.kind === 'whiteout' || shape.kind === 'highlight') {
+            ctx.save();
+            ctx.globalAlpha = shape.opacity;
+            ctx.fillStyle = shape.color;
+            ctx.fillRect(sx, sy, sw, sh);
+            ctx.restore();
+          } else if (
+            (shape.kind === 'image' || shape.kind === 'signature' || shape.kind === 'stamp') &&
+            shape.imageDataUrl
+          ) {
+            await new Promise<void>((resolve) => {
+              const img = new Image();
+              img.onload = () => {
+                ctx.save();
+                ctx.globalAlpha = shape.opacity;
+                ctx.drawImage(img, sx, sy, sw, sh);
+                ctx.restore();
+                resolve();
+              };
+              img.onerror = () => resolve();
+              img.src = shape.imageDataUrl!;
             });
-          } catch {
-            // Ignore watermark draw error
           }
         }
+
+        // 4. Draw Watermark if enabled
+        if (
+          watermarkSettings.enabled &&
+          watermarkSettings.text.trim() &&
+          (watermarkSettings.applyTo === 'all' ||
+            (watermarkSettings.applyTo === 'current' && pageNum === currentPage))
+        ) {
+          ctx.save();
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate((watermarkSettings.rotation * Math.PI) / 180);
+          ctx.fillStyle = watermarkSettings.color;
+          ctx.globalAlpha = watermarkSettings.opacity;
+          ctx.font = `800 ${watermarkSettings.fontSize * exportScale}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(watermarkSettings.text.toUpperCase(), 0, 0);
+          ctx.restore();
+        }
+
+        // 5. Convert canvas to high-quality JPEG and embed in output PDF
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.94);
+        const embeddedImg = await outPdfDoc.embedJpg(jpegDataUrl);
+        const newPage = outPdfDoc.addPage([baseViewport.width, baseViewport.height]);
+        newPage.drawImage(embeddedImg, {
+          x: 0,
+          y: 0,
+          width: baseViewport.width,
+          height: baseViewport.height,
+        });
       }
 
-      // Save PDF with universal backward compatibility (uncompressed XRef tables)
-      const outBytes = await pdfDoc.save({ useObjectStreams: false });
-      const totalPages = pdfDoc.getPageCount();
+      // Save uncompressed, standard PDF
+      const outBytes = await outPdfDoc.save({ useObjectStreams: false });
 
-      // Trigger safe async download
+      // Safe async download with 60-second retention
       const blob = new Blob([outBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -1488,7 +1471,6 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       document.body.appendChild(a);
       a.click();
 
-      // Delay revocation by 60 seconds so browser download manager finishes streaming without corruption
       setTimeout(() => {
         if (document.body.contains(a)) {
           document.body.removeChild(a);
