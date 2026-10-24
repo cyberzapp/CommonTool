@@ -35,7 +35,15 @@ import {
   Check,
   X,
   SlidersHorizontal,
+  Lock,
+  Shield,
+  ShieldCheck,
+  Key,
+  Eye,
+  EyeOff,
+  FileCheck,
 } from 'lucide-react';
+import { encryptPDF } from '@pdfsmaller/pdf-encrypt';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -473,6 +481,14 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     applyTo: 'all',
   });
 
+  // Document Security & Re-Encryption State
+  const [isOriginalEncrypted, setIsOriginalEncrypted] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportSecurityMode, setExportSecurityMode] = useState<'reencrypt' | 'password' | 'none'>('none');
+  const [userPasswordInput, setUserPasswordInput] = useState('');
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
+  const [allowCopyingText, setAllowCopyingText] = useState(false);
+
   const [isRendering, setIsRendering] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [statusBanner, setStatusBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -647,6 +663,26 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       } else {
         setZoom(1.15);
       }
+
+      // Detect if the original document was encrypted / secured (e.g. Jio bill, bank statement)
+      let originalSecured = false;
+      try {
+        const loadingTask = pdfjsLib.getDocument({ data: bytes.slice(0) });
+        const pdf = await loadingTask.promise;
+        const meta = await pdf.getMetadata().catch(() => null);
+        const perms = await pdf.getPermissions().catch(() => null);
+        const infoRecord = meta?.info as Record<string, unknown> | undefined;
+        if (Boolean(infoRecord?.EncryptFilterName) || perms !== null) {
+          originalSecured = true;
+        }
+      } catch {
+        const sample = new TextDecoder('latin1').decode(bytes.slice(0, 50000));
+        if (sample.includes('/Encrypt')) {
+          originalSecured = true;
+        }
+      }
+      setIsOriginalEncrypted(originalSecured);
+      setExportSecurityMode(originalSecured ? 'reencrypt' : 'none');
     } catch (err: unknown) {
       setStatusBanner({
         type: 'error',
@@ -1303,8 +1339,12 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
     await loadPdfBuffer(bytes, 'Sample-Editable-Agreement.pdf');
   };
 
-  // Export the final edited PDF using High-DPI Canvas Compositing (100% immune to encryption & stream corruption)
-  const exportEditedPdf = async () => {
+  // Export the final edited PDF using High-DPI Canvas Compositing with optional authentic re-encryption
+  const exportEditedPdf = async (options?: {
+    mode?: 'reencrypt' | 'password' | 'none';
+    password?: string;
+    allowCopying?: boolean;
+  }) => {
     if (!pdfBytes) return;
     setIsExporting(true);
     setStatusBanner(null);
@@ -1459,7 +1499,53 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
       }
 
       // Save uncompressed, standard PDF
-      const outBytes = await outPdfDoc.save({ useObjectStreams: false });
+      let outBytes = await outPdfDoc.save({ useObjectStreams: false });
+
+      // Apply PDF Encryption / Security if selected
+      const secMode = options?.mode ?? exportSecurityMode;
+      const pwd = (options?.password ?? userPasswordInput).trim();
+      const allowCopy = options?.allowCopying ?? allowCopyingText;
+
+      let securityBadgeMsg = '';
+
+      if (secMode === 'reencrypt') {
+        try {
+          // Authentic PDF Owner Encryption (empty user password opens freely without prompt, but flags as (SECURED) with locked edits)
+          const randomOwnerPass = 'owner-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+          const isSubtleAvailable = typeof window !== 'undefined' && Boolean(window.crypto?.subtle);
+          outBytes = await encryptPDF(outBytes, '', {
+            ownerPassword: randomOwnerPass,
+            algorithm: isSubtleAvailable ? 'AES-256' : 'RC4',
+            allowPrinting: true,
+            allowHighQualityPrint: true,
+            allowModifying: false,
+            allowCopying: allowCopy,
+            allowFillingForms: true,
+            allowAnnotating: false,
+            allowAssembly: false,
+            allowExtraction: false,
+          });
+          securityBadgeMsg = ' with authentic (SECURED) encryption';
+        } catch (encErr) {
+          console.warn('Re-encryption notice, downloading standard PDF:', encErr);
+        }
+      } else if (secMode === 'password' && pwd.length > 0) {
+        try {
+          // User Password Protection (requires entering password to open)
+          const randomOwnerPass = 'owner-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+          const isSubtleAvailable = typeof window !== 'undefined' && Boolean(window.crypto?.subtle);
+          outBytes = await encryptPDF(outBytes, pwd, {
+            ownerPassword: randomOwnerPass,
+            algorithm: isSubtleAvailable ? 'AES-256' : 'RC4',
+            allowPrinting: true,
+            allowHighQualityPrint: true,
+            allowFillingForms: true,
+          });
+          securityBadgeMsg = ' with password protection';
+        } catch (encErr) {
+          console.warn('Password encryption notice, downloading standard PDF:', encErr);
+        }
+      }
 
       // Safe async download with 60-second retention
       const blob = new Blob([outBytes], { type: 'application/pdf' });
@@ -1482,9 +1568,11 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         onPdfSaved(outBytes, fileName || 'Document.pdf');
       }
 
+      setShowExportModal(false);
+
       setStatusBanner({
         type: 'success',
-        message: `Successfully exported ${totalPages}-page edited PDF (${fileName || 'Document.pdf'})!`,
+        message: `Successfully exported ${totalPages}-page edited PDF${securityBadgeMsg} (${fileName || 'Document.pdf'})!`,
       });
     } catch (err: unknown) {
       setStatusBanner({
@@ -1560,16 +1648,36 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
               </label>
 
               {pdfBytes && (
-                <button
-                  onClick={exportEditedPdf}
-                  disabled={isExporting}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  {isExporting
-                    ? 'Exporting PDF...'
-                    : `Download Edited PDF${modifiedCount > 0 ? ` (${modifiedCount} edits)` : ''}`}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => {
+                      if (isOriginalEncrypted) {
+                        setShowExportModal(true);
+                      } else {
+                        exportEditedPdf();
+                      }
+                    }}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    {isExporting
+                      ? 'Exporting PDF...'
+                      : `Download Edited PDF${modifiedCount > 0 ? ` (${modifiedCount} edits)` : ''}`}
+                  </button>
+
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    title="Export & Security Options (Re-encrypt as Real Document / Password Protect)"
+                    className={`p-2 rounded-xl text-xs font-semibold cursor-pointer border transition-colors ${
+                      isOriginalEncrypted
+                        ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
+                        : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -1832,20 +1940,46 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                   />
                 </label>
 
-                <button
-                  onClick={exportEditedPdf}
-                  disabled={isExporting}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-md"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>{isExporting ? 'Exporting...' : `Download PDF${modifiedCount > 0 ? ` (${modifiedCount})` : ''}`}</span>
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      if (isOriginalEncrypted) {
+                        setShowExportModal(true);
+                      } else {
+                        exportEditedPdf();
+                      }
+                    }}
+                    disabled={isExporting}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-md"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>{isExporting ? 'Exporting...' : `Download PDF${modifiedCount > 0 ? ` (${modifiedCount})` : ''}`}</span>
+                  </button>
+
+                  <button
+                    onClick={() => setShowExportModal(true)}
+                    title="Export & Security Options (Re-encrypt as Real Document)"
+                    className={`p-1.5 rounded-xl text-xs font-semibold cursor-pointer border transition-colors ${
+                      isOriginalEncrypted
+                        ? 'bg-emerald-950/60 border-emerald-500/50 text-emerald-300 hover:bg-emerald-900/60'
+                        : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               </div>
             </div>
 
             {/* Sub-bar Guidance */}
             <div className="flex items-center justify-between pt-1 border-t border-slate-800/70 text-[11px] text-slate-400">
               <span className="flex items-center gap-2">
+                {isOriginalEncrypted && (
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
+                    <Lock className="w-2.5 h-2.5" />
+                    <span>SECURED PDF</span>
+                  </span>
+                )}
                 <span>
                   {toolMode === 'edit-text' &&
                     `Click any text on the page below to edit it directly (${currentPageItems.length} editable blocks on Page ${currentPage}).`}
@@ -2861,6 +2995,198 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                 className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs cursor-pointer"
               >
                 Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export & Document Security / Re-encryption Modal */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-2xl bg-slate-900 border border-slate-800 p-5 space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-sm font-bold text-white">Download & Security Options</h3>
+              </div>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {isOriginalEncrypted && (
+              <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-start gap-2.5 text-xs text-emerald-200">
+                <Lock className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-emerald-300">Original Document is Secured</p>
+                  <p className="text-[11px] text-emerald-400/80 leading-relaxed mt-0.5">
+                    Your original PDF (like Reliance Jio / corporate invoices) was protected with Standard PDF Security. You can re-encrypt it to preserve this exact authentic signature.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2.5">
+              <label className="block text-xs font-semibold text-slate-300">Choose Export Security Mode</label>
+
+              {/* Option 1: Authentic Re-encryption (SECURED) */}
+              <div
+                onClick={() => setExportSecurityMode('reencrypt')}
+                className={`p-3 rounded-xl border cursor-pointer transition-colors ${
+                  exportSecurityMode === 'reencrypt'
+                    ? 'bg-emerald-950/30 border-emerald-500/60'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="exportSecMode"
+                    checked={exportSecurityMode === 'reencrypt'}
+                    onChange={() => setExportSecurityMode('reencrypt')}
+                    className="mt-1 accent-emerald-500 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white">Re-Encrypt as Authentic (SECURED)</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-semibold">
+                        Recommended for Bills & Invoices
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                      Applies authentic AES-256 PDF encryption with Owner Security. The PDF opens immediately in any viewer without asking for a password, and displays <strong>(SECURED)</strong> in Adobe Acrobat with locked modifications, exactly like genuine telecom & bank statements.
+                    </p>
+
+                    {exportSecurityMode === 'reencrypt' && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center gap-2">
+                        <label className="inline-flex items-center gap-2 text-[11px] text-slate-300 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={allowCopyingText}
+                            onChange={(e) => setAllowCopyingText(e.target.checked)}
+                            className="rounded accent-emerald-500 cursor-pointer"
+                          />
+                          <span>Allow text copying in readers</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Option 2: Password Protect */}
+              <div
+                onClick={() => setExportSecurityMode('password')}
+                className={`p-3 rounded-xl border cursor-pointer transition-colors ${
+                  exportSecurityMode === 'password'
+                    ? 'bg-amber-950/30 border-amber-500/60'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="exportSecMode"
+                    checked={exportSecurityMode === 'password'}
+                    onChange={() => setExportSecurityMode('password')}
+                    className="mt-1 accent-amber-500 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-bold text-white">Password Protect Document</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-semibold">
+                        Confidential
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                      Anyone opening the PDF will be required to type this password before they can view its contents (ideal for salary slips, confidential agreements, or bank statements).
+                    </p>
+
+                    {exportSecurityMode === 'password' && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-800/80 space-y-1.5" onClick={(e) => e.stopPropagation()}>
+                        <label className="block text-[11px] font-medium text-slate-300">Set Open Password</label>
+                        <div className="relative">
+                          <Key className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+                          <input
+                            type={showPasswordInput ? 'text' : 'password'}
+                            value={userPasswordInput}
+                            onChange={(e) => setUserPasswordInput(e.target.value)}
+                            placeholder="Enter password (e.g. 1234 or DOB)"
+                            className="w-full pl-9 pr-9 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white focus:outline-none focus:border-amber-500"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPasswordInput((v) => !v)}
+                            className="absolute right-3 top-2.5 text-slate-400 hover:text-white cursor-pointer"
+                          >
+                            {showPasswordInput ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Option 3: Standard Unencrypted */}
+              <div
+                onClick={() => setExportSecurityMode('none')}
+                className={`p-3 rounded-xl border cursor-pointer transition-colors ${
+                  exportSecurityMode === 'none'
+                    ? 'bg-indigo-950/30 border-indigo-500/60'
+                    : 'bg-slate-950/60 border-slate-800 hover:border-slate-700'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <input
+                    type="radio"
+                    name="exportSecMode"
+                    checked={exportSecurityMode === 'none'}
+                    onChange={() => setExportSecurityMode('none')}
+                    className="mt-1 accent-indigo-500 cursor-pointer"
+                  />
+                  <div className="flex-1">
+                    <span className="text-xs font-bold text-white">Standard Unencrypted PDF</span>
+                    <p className="text-[11px] text-slate-400 leading-relaxed mt-1">
+                      Pristine, universal PDF with no passwords or permission restrictions. Opens in every viewer and can be re-edited freely.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex items-center justify-between border-t border-slate-800">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  exportEditedPdf({
+                    mode: exportSecurityMode,
+                    password: userPasswordInput,
+                    allowCopying: allowCopyingText,
+                  });
+                }}
+                disabled={isExporting || (exportSecurityMode === 'password' && !userPasswordInput.trim())}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white font-bold text-xs cursor-pointer shadow-lg shadow-indigo-600/30"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>
+                  {isExporting
+                    ? 'Generating Encrypted PDF...'
+                    : exportSecurityMode === 'reencrypt'
+                    ? 'Download (SECURED) PDF'
+                    : exportSecurityMode === 'password'
+                    ? 'Download Password-Protected PDF'
+                    : 'Download PDF'}
+                </span>
               </button>
             </div>
           </div>
