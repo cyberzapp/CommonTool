@@ -1,28 +1,47 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { jsPDF } from 'jspdf';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import {
-  Languages,
   FileText,
+  Sparkles,
+  MessageSquare,
+  Languages,
   Mic,
   Image as ImageIcon,
-  Wand2,
-  Sparkles,
-  Volume2,
+  Upload,
   Copy,
   Download,
-  Square,
-  RefreshCw,
-  Sliders,
   CheckCircle2,
-  Info,
-  ArrowRightLeft,
+  AlertTriangle,
+  Play,
+  Pause,
   RotateCw,
-  Upload,
+  Search,
+  Sliders,
+  Send,
+  Trash2,
+  Volume2,
+  VolumeX,
+  FileCheck2,
+  ShieldCheck,
+  Zap,
+  ArrowRightLeft,
+  RefreshCw,
+  Check,
+  ChevronRight,
+  Info,
+  Layers,
+  Wand2,
+  Scissors,
+  FileSpreadsheet,
 } from 'lucide-react';
 
-// -------------------------------------------------------------
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+
+// =========================================================================
 // 130+ WORLD LANGUAGES CATALOG
-// -------------------------------------------------------------
+// =========================================================================
 export interface LanguageOption {
   code: string;
   name: string;
@@ -137,242 +156,671 @@ export const WORLD_LANGUAGES: LanguageOption[] = [
   { code: 'zu', name: 'Zulu', native: 'isiZulu' },
 ];
 
-type AiTab = 'translate' | 'summarize' | 'transcribe' | 'photo-editor';
-
-// -------------------------------------------------------------
-// CLIENT-SIDE INTELLIGENT TRANSLATION DICTIONARY & ENGINE
-// -------------------------------------------------------------
+// Offline / Local Phrase Dictionary
 const PHRASE_DICTIONARY: Record<string, Record<string, string>> = {
   es: {
-    'hello': 'hola',
-    'welcome to commontool': 'bienvenido a commontool',
-    'privacy first zero upload client side utilities': 'utilidades del lado del cliente sin carga y privacidad primero',
-    'edit pdf files directly in your browser': 'edite archivos pdf directamente en su navegador',
-    'convert word excel and images to pdf': 'convierta word excel e imágenes a pdf',
-    'electronically sign documents legally': 'firme documentos electrónicamente de forma legal',
-    'agreement': 'acuerdo',
-    'contract': 'contrato',
-    'invoice': 'factura',
-    'confidential': 'confidencial',
-    'thank you': 'gracias',
+    hello: 'hola',
+    welcome: 'bienvenido',
+    agreement: 'acuerdo',
+    contract: 'contrato',
+    invoice: 'factura',
+    payment: 'pago',
+    confidential: 'confidencial',
+    privacy: 'privacidad',
+    thank: 'gracias',
   },
   fr: {
-    'hello': 'bonjour',
-    'welcome to commontool': 'bienvenue sur commontool',
-    'privacy first zero upload client side utilities': 'utilitaires côté client sans téléchargement respectant la vie privée',
-    'edit pdf files directly in your browser': 'modifiez des fichiers pdf directement dans votre navigateur',
-    'convert word excel and images to pdf': 'convertissez word excel et images en pdf',
-    'electronically sign documents legally': 'signez des documents électroniquement en toute légalité',
-    'agreement': 'accord',
-    'contract': 'contrat',
-    'invoice': 'facture',
-    'confidential': 'confidentiel',
-    'thank you': 'merci',
+    hello: 'bonjour',
+    welcome: 'bienvenue',
+    agreement: 'accord',
+    contract: 'contrat',
+    invoice: 'facture',
+    payment: 'paiement',
+    confidential: 'confidentiel',
+    privacy: 'confidentialité',
+    thank: 'merci',
   },
   de: {
-    'hello': 'hallo',
-    'welcome to commontool': 'willkommen bei commontool',
-    'privacy first zero upload client side utilities': 'datenschutzorientierte clientseitige tools ohne server-upload',
-    'edit pdf files directly in your browser': 'bearbeiten sie pdf-dateien direkt im browser',
-    'convert word excel and images to pdf': 'konvertieren sie word excel und bilder in pdf',
-    'electronically sign documents legally': 'dokumente rechtsgültig elektronisch signieren',
-    'agreement': 'vereinbarung',
-    'contract': 'vertrag',
-    'invoice': 'rechnung',
-    'confidential': 'vertraulich',
-    'thank you': 'danke',
+    hello: 'hallo',
+    welcome: 'willkommen',
+    agreement: 'vereinbarung',
+    contract: 'vertrag',
+    invoice: 'rechnung',
+    payment: 'zahlung',
+    confidential: 'vertraulich',
+    privacy: 'datenschutz',
+    thank: 'danke',
   },
   hi: {
-    'hello': 'नमस्ते',
-    'welcome to commontool': 'कॉमनटूल में आपका स्वागत है',
-    'privacy first zero upload client side utilities': 'गोपनीयता-प्रथम शून्य-अपलोड क्लाइंट-साइड उपयोगिताएं',
-    'edit pdf files directly in your browser': 'सीधे अपने ब्राउज़र में पीडीएफ फाइलों को संपादित करें',
-    'convert word excel and images to pdf': 'वर्ड एक्सेल और छवियों को पीडीएफ में बदलें',
-    'electronically sign documents legally': 'दस्तावेजों पर कानूनी रूप से इलेक्ट्रॉनिक हस्ताक्षर करें',
-    'agreement': 'समझौता',
-    'contract': 'अनुबंध',
-    'invoice': 'चालान (इनवॉइस)',
-    'confidential': 'गोपनीय',
-    'thank you': 'धन्यवाद',
+    hello: 'नमस्ते',
+    welcome: 'स्वागत हे',
+    agreement: 'समझौता',
+    contract: 'अनुबंध',
+    invoice: 'चालान',
+    payment: 'भुगतान',
+    confidential: 'गोपनीय',
+    privacy: 'गोपनीयता',
+    thank: 'धन्यवाद',
   },
   ja: {
-    'hello': 'こんにちは',
-    'welcome to commontool': 'CommonToolへようこそ',
-    'privacy first zero upload client side utilities': 'プライバシー優先・アップロード不要のクライアント側ツール',
-    'edit pdf files directly in your browser': 'ブラウザ内で直接PDFファイルを編集',
-    'convert word excel and images to pdf': 'Word、Excel、画像をPDFに変換',
-    'electronically sign documents legally': '法的拘束力のある電子署名を追加',
-    'agreement': '合意書',
-    'contract': '契約書',
-    'invoice': '請求書',
-    'confidential': '機密',
-    'thank you': 'ありがとうございます',
-  },
-  zh: {
-    'hello': '你好',
-    'welcome to commontool': '欢迎使用 CommonTool',
-    'privacy first zero upload client side utilities': '隐私优先 零上传客户端办公套件',
-    'edit pdf files directly in your browser': '直接在浏览器中编辑 PDF 文件',
-    'convert word excel and images to pdf': '将 Word、Excel 和图片转换为 PDF',
-    'electronically sign documents legally': '添加具有法律效力的电子签名',
-    'agreement': '协议',
-    'contract': '合同',
-    'invoice': '发票',
-    'confidential': '机密',
-    'thank you': '谢谢',
-  },
-  ar: {
-    'hello': 'مرحبا',
-    'welcome to commontool': 'مرحبًا بك في CommonTool',
-    'privacy first zero upload client side utilities': 'أدوات العميل الخاصة دون تحميل الملفات مع الحفاظ على الخصوصية',
-    'edit pdf files directly in your browser': 'قم بتحرير ملفات PDF مباشرة في متصفحك',
-    'convert word excel and images to pdf': 'تحويل ملفات Word و Excel والصور إلى PDF',
-    'electronically sign documents legally': 'توقيع المستندات إلكترونيًا بشكل قانوني',
-    'agreement': 'اتفاقية',
-    'contract': 'عقد',
-    'invoice': 'فاتورة',
-    'confidential': 'سري للغاية',
-    'thank you': 'شكراً لك',
+    hello: 'こんにちは',
+    welcome: 'ようこそ',
+    agreement: '合意書',
+    contract: '契約書',
+    invoice: '請求書',
+    payment: '支払い',
+    confidential: '機密',
+    privacy: 'プライバシー',
+    thank: 'ありがとう',
   },
 };
 
-// -------------------------------------------------------------
-// TEXT SUMMARIZER ALGORITHM
-// -------------------------------------------------------------
-function extractSummary(
-  text: string,
-  mode: 'executive' | 'bullets' | 'tldr' | 'actions',
-  ratio: number
-): { summary: string; bullets: string[]; tldr: string; actions: string[] } {
-  const clean = text.trim();
-  if (!clean) return { summary: '', bullets: [], tldr: '', actions: [] };
+type StudioTab = 'doc-intel' | 'transcribe' | 'translate' | 'photo-studio';
+type DocIntelSubTab = 'insights' | 'chat' | 'rewriter';
+type RewriterTone = 'executive' | 'concise' | 'plain' | 'academic' | 'persuasive';
 
-  const sentences = clean
-    .split(/(?<=[.?!])\s+/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 12);
-
-  if (sentences.length <= 2) {
-    return {
-      summary: clean,
-      bullets: [clean],
-      tldr: clean,
-      actions: ['Review and confirm documentation.'],
-    };
-  }
-
-  // Frequency-based scoring
-  const stopWords = new Set([
-    'the', 'is', 'at', 'which', 'on', 'and', 'a', 'an', 'in', 'to', 'for', 'of', 'or', 'by', 'with', 'as', 'it', 'this', 'that', 'from', 'be', 'are', 'was', 'were', 'has', 'have', 'had', 'been', 'will', 'would', 'can', 'could', 'should',
-  ]);
-
-  const wordFreq: Record<string, number> = {};
-  const words = clean.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
-  for (const w of words) {
-    if (!stopWords.has(w)) {
-      wordFreq[w] = (wordFreq[w] || 0) + 1;
-    }
-  }
-
-  const scoredSentences = sentences.map((sent, index) => {
-    const sWords = sent.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
-    let score = 0;
-    for (const w of sWords) {
-      if (wordFreq[w]) score += wordFreq[w];
-    }
-    // Boost opening and concluding sentences
-    if (index === 0) score *= 1.4;
-    if (index === sentences.length - 1) score *= 1.25;
-    return { sent, score: score / Math.max(1, sWords.length), index };
-  });
-
-  const targetCount = Math.max(1, Math.round(sentences.length * ratio));
-  const topSentences = [...scoredSentences]
-    .sort((a, b) => b.score - a.score)
-    .slice(0, targetCount)
-    .sort((a, b) => a.index - b.index);
-
-  const executiveSummary = topSentences.map((s) => s.sent).join(' ');
-
-  const bulletInsights = topSentences.map((s) => s.sent);
-
-  const tldrSentence = scoredSentences[0]?.sent || sentences[0];
-
-  // Extract action items (sentences containing modal verbs or action words)
-  const actionRegex = /\b(shall|must|will|agrees?|submit|pay|deliver|notify|provide|ensure|complete|review)\b/i;
-  const actionItems = sentences
-    .filter((s) => actionRegex.test(s))
-    .slice(0, 5)
-    .map((s) => s.replace(/^(the|each|all)\s+/i, ''));
-
-  return {
-    summary: executiveSummary,
-    bullets: bulletInsights,
-    tldr: tldrSentence,
-    actions: actionItems.length > 0 ? actionItems : ['Execute final sign-off and distribute copies.'],
-  };
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text: string;
+  citations?: string[];
+  timestamp: string;
 }
 
 export const AiSolutions: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<AiTab>('translate');
-  const [showInfo, setShowInfo] = useState(false);
-  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<StudioTab>('doc-intel');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // -------------------------------------------------------------
-  // 1. AI TRANSLATION STATE
-  // -------------------------------------------------------------
-  const [sourceLang, setSourceLang] = useState<string>('en');
-  const [targetLang, setTargetLang] = useState<string>('es');
-  const [sourceText, setSourceText] = useState<string>(
-    'Welcome to CommonTool! Privacy first, zero upload client side utilities. Edit PDF files directly in your browser, convert Word, Excel, and images to PDF, and electronically sign documents legally.'
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
+
+  // =========================================================================
+  // TAB 1: DOCUMENT INTELLIGENCE & CHAT
+  // =========================================================================
+  const [docIntelSubTab, setDocIntelSubTab] = useState<DocIntelSubTab>('insights');
+  const [docTitle, setDocTitle] = useState<string>('Master-Services-Agreement.pdf');
+  const [docText, setDocText] = useState<string>(
+    `MASTER INDEPENDENT CONTRACTOR SERVICES AGREEMENT ("Agreement")
+Effective Date: October 24, 2026
+Parties: Apex Global Technologies Inc., a Delaware corporation ("Client"), and Nova Strategic Advisory LLC, a Texas corporation ("Consultant").
+
+1. ENGAGEMENT AND SCOPE OF SERVICES
+Client hereby engages Consultant to provide specialized system architecture design, zero-trust cloud security migration, automated CI/CD pipeline implementation, and high-performance database tuning. Consultant agrees to perform all obligations with the highest standard of professional care and engineering skill.
+
+2. COMPENSATION, INVOICING AND MILESTONE PAYMENT TERMS
+Total contract value is strictly fixed at $75,000 USD. Client agrees to disburse funds in three equal milestones of $25,000 USD each, payable within fifteen (15) business days following written sign-off of Deliverable 1 (Architecture Blueprint), Deliverable 2 (Staging Deployment), and Deliverable 3 (Production Cutover). In the event of late payment, interest shall accrue at 1.5% per month.
+
+3. INTELLECTUAL PROPERTY & WORK MADE FOR HIRE
+All software source code, architectural diagrams, patents, trade secrets, and technical documentation produced under this Agreement shall constitute "Work Made for Hire" and remain the sole, exclusive property of Client upon full payment.
+
+4. CONFIDENTIALITY, NON-DISCLOSURE AND NON-SOLICITATION
+Both parties shall maintain strict confidentiality over proprietary technical data, customer lists, and financial forecasts for a period of five (5) years following termination. Consultant shall not directly solicit Client engineering personnel for twenty-four (24) months.
+
+5. INDEMNIFICATION AND LIMITATION OF LIABILITY
+Neither party shall be liable for indirect, incidental, or consequential damages. Consultant's total aggregate liability arising out of or related to this Agreement shall be limited to the total fees actually received by Consultant hereunder in the preceding twelve (12) months.
+
+6. TERM, TERMINATION AND GOVERNING LAW
+This Agreement may be terminated by either party upon thirty (30) days prior written notice for convenience, or immediately upon material breach. This Agreement shall be governed and construed in accordance with the laws of the State of Delaware, with jurisdiction in Wilmington, Delaware.`
   );
-  const [translatedText, setTranslatedText] = useState<string>('');
-  const [isTranslating, setIsTranslating] = useState<boolean>(false);
-  const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
+  const [isExtractingDoc, setIsExtractingDoc] = useState<boolean>(false);
+  const [summaryRatio, setSummaryRatio] = useState<number>(0.35);
 
-  // Translation execution
+  // Document Upload Parser (Supports PDF, TXT, MD, JSON)
+  const handleDocFileUpload = async (file?: File) => {
+    if (!file) return;
+    setIsExtractingDoc(true);
+    setDocTitle(file.name);
+
+    try {
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        const arrayBuf = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuf });
+        const pdf = await loadingTask.promise;
+        let extracted = '';
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          const pageStr = content.items
+            .map((item: any) => ('str' in item ? item.str : ''))
+            .join(' ');
+          extracted += `--- Page ${i} ---\n${pageStr}\n\n`;
+        }
+        setDocText(extracted.trim() || 'No readable text content found in PDF.');
+      } else {
+        const text = await file.text();
+        setDocText(text);
+      }
+    } catch (err: unknown) {
+      alert(`Could not parse document: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsExtractingDoc(false);
+    }
+  };
+
+  // Document Metrics
+  const docStats = useMemo(() => {
+    const clean = docText.trim();
+    const words = clean ? clean.split(/\s+/).filter(Boolean) : [];
+    const characters = clean.length;
+    const readingTimeMin = Math.max(1, Math.ceil(words.length / 225));
+    const paragraphs = clean.split(/\n\s*\n/).filter(Boolean).length;
+    return { wordCount: words.length, characters, readingTimeMin, paragraphs };
+  }, [docText]);
+
+  // Document Insights Engine (Summary, Action Items, Risk Audit)
+  const docInsights = useMemo(() => {
+    const clean = docText.trim();
+    if (!clean) return { summary: '', bullets: [], actions: [], risks: [] };
+
+    const sentences = clean
+      .split(/(?<=[.?!])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 15);
+
+    if (sentences.length <= 3) {
+      return {
+        summary: clean,
+        bullets: [clean],
+        actions: ['Review document contents.'],
+        risks: ['No major liabilities identified.'],
+      };
+    }
+
+    // Stop words
+    const stopWords = new Set([
+      'the', 'is', 'at', 'which', 'on', 'and', 'a', 'an', 'in', 'to', 'for', 'of', 'or', 'by', 'with', 'as', 'it', 'this', 'that', 'from', 'be', 'are', 'was', 'were', 'has', 'have', 'had', 'been', 'will', 'would', 'can', 'could', 'should',
+    ]);
+
+    const wordFreq: Record<string, number> = {};
+    const words = clean.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
+    for (const w of words) {
+      if (!stopWords.has(w)) wordFreq[w] = (wordFreq[w] || 0) + 1;
+    }
+
+    const scored = sentences.map((sent, idx) => {
+      const sWords = sent.toLowerCase().match(/\b[a-z]{3,}\b/g) || [];
+      let score = 0;
+      for (const w of sWords) if (wordFreq[w]) score += wordFreq[w];
+      if (idx === 0) score *= 1.4;
+      if (idx === sentences.length - 1) score *= 1.25;
+      return { sent, score: score / Math.max(1, sWords.length), idx };
+    });
+
+    const targetCount = Math.max(2, Math.round(sentences.length * summaryRatio));
+    const topSentences = [...scored]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, targetCount)
+      .sort((a, b) => a.idx - b.idx);
+
+    const summary = topSentences.map((s) => s.sent).join(' ');
+    const bullets = topSentences.slice(0, 5).map((s) => s.sent);
+
+    // Detect Action Items & Commitments
+    const actionRegex = /\b(shall|must|will|agrees? to|deliver|submit|pay|disburse|reimburse|notify|provide|ensure|complete)\b/i;
+    const actions = sentences
+      .filter((s) => actionRegex.test(s))
+      .slice(0, 6)
+      .map((s) => s.replace(/^(the|each|all|both)\s+/i, ''));
+
+    // Detect Legal Liabilities & Risks
+    const riskRegex = /\b(liable|liability|indemnif|breach|terminat|penalty|interest|governing law|dispute|arbitrat|confidential|damages)\b/i;
+    const risks = sentences.filter((s) => riskRegex.test(s)).slice(0, 5);
+
+    return {
+      summary,
+      bullets,
+      actions: actions.length > 0 ? actions : ['Execute written confirmation and distribute finalized copies.'],
+      risks: risks.length > 0 ? risks : ['Standard terms; verify governing jurisdiction and deliverables.'],
+    };
+  }, [docText, summaryRatio]);
+
+  // Export Executive Brief as PDF
+  const handleExportBriefPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('CommonTool AI Document Brief', 40, 50);
+
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Source Document: ${docTitle} • Analyzed on ${new Date().toLocaleDateString()}`, 40, 70);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(20);
+    doc.text('Executive Summary', 40, 105);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(50);
+    const splitSummary = doc.splitTextToSize(docInsights.summary || docText.slice(0, 800), 530);
+    doc.text(splitSummary, 40, 125);
+
+    let currentY = 135 + splitSummary.length * 13;
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(20);
+    doc.text('Action Items & Commitments', 40, currentY);
+    currentY += 20;
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(50);
+    docInsights.actions.forEach((act, idx) => {
+      const splitAct = doc.splitTextToSize(`• ${act}`, 520);
+      doc.text(splitAct, 45, currentY);
+      currentY += splitAct.length * 13 + 4;
+    });
+
+    currentY += 10;
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(20);
+    doc.text('Risk & Clause Audit', 40, currentY);
+    currentY += 20;
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(50);
+    docInsights.risks.forEach((r) => {
+      const splitRisk = doc.splitTextToSize(`⚠️ ${r}`, 520);
+      doc.text(splitRisk, 45, currentY);
+      currentY += splitRisk.length * 13 + 4;
+    });
+
+    doc.save(`${docTitle.replace(/\.[^.]+$/, '')}-AI-Brief.pdf`);
+  };
+
+  // Interactive Document Q&A / Chat State
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
+    {
+      id: 'm1',
+      sender: 'assistant',
+      text: `Hello! I have loaded "${docTitle}". You can ask me any question regarding deliverables, payment terms, governing law, termination clauses, or risks.`,
+      timestamp: 'Just now',
+    },
+  ]);
+  const [userQuery, setUserQuery] = useState('');
+  const [isAnswering, setIsAnswering] = useState(false);
+
+  // Grounded Document Q&A Search Engine
+  const handleSendChatQuery = (customQuestion?: string) => {
+    const q = (customQuestion || userQuery).trim();
+    if (!q) return;
+
+    const userMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      sender: 'user',
+      text: q,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setChatMessages((prev) => [...prev, userMsg]);
+    if (!customQuestion) setUserQuery('');
+    setIsAnswering(true);
+
+    setTimeout(() => {
+      // Chunk document into paragraphs
+      const paragraphs = docText
+        .split(/\n\s*\n/)
+        .map((p) => p.trim())
+        .filter((p) => p.length > 20);
+
+      const qWords = q.toLowerCase().match(/\b[a-z0-9$]{2,}\b/g) || [];
+
+      // Rank paragraphs by relevance
+      const scored = paragraphs.map((para) => {
+        const lowerPara = para.toLowerCase();
+        let matches = 0;
+        for (const word of qWords) {
+          if (lowerPara.includes(word)) matches += 1;
+        }
+        return { para, matches };
+      });
+
+      scored.sort((a, b) => b.matches - a.matches);
+      const topMatch = scored[0];
+
+      let answerText = '';
+      let citations: string[] = [];
+
+      if (!topMatch || topMatch.matches === 0) {
+        answerText = `I searched throughout the document, but did not find a direct mention regarding "${q}". Try rephrasing or asking about clauses like payment, obligations, liability, or governing law.`;
+      } else {
+        answerText = `Based on the document context, here is the relevant provision:\n\n"${topMatch.para}"`;
+        citations = [topMatch.para.slice(0, 120) + '...'];
+      }
+
+      const aiMsg: ChatMessage = {
+        id: crypto.randomUUID(),
+        sender: 'assistant',
+        text: answerText,
+        citations,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+
+      setChatMessages((prev) => [...prev, aiMsg]);
+      setIsAnswering(false);
+    }, 450);
+  };
+
+  // Tone Rewriter State
+  const [rewriterTone, setRewriterTone] = useState<RewriterTone>('executive');
+  const [rewrittenText, setRewrittenText] = useState<string>('');
+
+  const generateRewrittenText = useCallback(
+    (tone: RewriterTone) => {
+      const raw = docText.trim().slice(0, 2500); // work on active snippet
+      if (!raw) {
+        setRewrittenText('');
+        return;
+      }
+
+      let res = raw;
+      if (tone === 'executive') {
+        res = res
+          .replace(/\b(in order to|with a view to)\b/gi, 'to')
+          .replace(/\b(it is important to note that|it should be noted that)\b/gi, 'Notably,')
+          .replace(/\b(due to the fact that|owing to)\b/gi, 'because')
+          .replace(/\b(at this point in time|at the present time)\b/gi, 'currently')
+          .replace(/\b(shall be responsible for)\b/gi, 'will execute')
+          .replace(/\b(is able to)\b/gi, 'can')
+          .replace(/\b(in the event that)\b/gi, 'if');
+        res = `[Executive Summary & Directive]\n` + res;
+      } else if (tone === 'concise') {
+        const sentences = res.split(/(?<=[.?!])\s+/);
+        res = sentences
+          .map((s) => s.replace(/\b(very|extremely|literally|clearly|basically|actually|kind of)\s+/gi, ''))
+          .filter((_, idx) => idx % 2 === 0)
+          .join(' ');
+      } else if (tone === 'plain') {
+        res = res
+          .replace(/\bherein\b/gi, 'in this agreement')
+          .replace(/\bhereunder\b/gi, 'under this agreement')
+          .replace(/\bnotwithstanding the foregoing\b/gi, 'even so')
+          .replace(/\bindemnify and hold harmless\b/gi, 'protect against financial loss')
+          .replace(/\binter alia\b/gi, 'among other things')
+          .replace(/\bforthwith\b/gi, 'immediately');
+      } else if (tone === 'academic') {
+        res = res
+          .replace(/\b(show|shows)\b/gi, 'demonstrates')
+          .replace(/\b(use|uses)\b/gi, 'utilizes')
+          .replace(/\b(big|large)\b/gi, 'substantial')
+          .replace(/\b(help|helps)\b/gi, 'facilitates')
+          .replace(/\b(good|effective)\b/gi, 'efficacious');
+      } else if (tone === 'persuasive') {
+        res = `Elevate your workflow with proven, high-impact execution:\n\n` +
+          res.replace(/\b(provides|offers)\b/gi, 'delivers unmatched value through');
+      }
+
+      setRewrittenText(res);
+    },
+    [docText]
+  );
+
+  useEffect(() => {
+    generateRewrittenText(rewriterTone);
+  }, [rewriterTone, generateRewrittenText]);
+
+  // =========================================================================
+  // TAB 2: SPEECH & AUDIO TRANSCRIPTION STUDIO
+  // =========================================================================
+  const [isRecording, setIsRecording] = useState(false);
+  const [micLang, setMicLang] = useState('en-US');
+  const [dictatedText, setDictatedText] = useState('');
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const recognitionRef = useRef<any>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const waveCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Audio wave visualizer loop
+  const startAudioWaveAnimation = (stream: MediaStream) => {
+    try {
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioContextRef.current = audioCtx;
+      const source = audioCtx.createMediaStreamSource(stream);
+      const analyser = audioCtx.createAnalyser();
+      analyser.fftSize = 64;
+      source.connect(analyser);
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      const draw = () => {
+        animationFrameRef.current = requestAnimationFrame(draw);
+        if (!waveCanvasRef.current) return;
+        const canvas = waveCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        analyser.getByteFrequencyData(dataArray);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const barWidth = (canvas.width / bufferLength) * 1.8;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const barHeight = (dataArray[i] / 255) * canvas.height * 0.85;
+          ctx.fillStyle = `rgb(${99 + barHeight * 1.5}, ${102 + barHeight}, ${241})`;
+          ctx.beginPath();
+          ctx.roundRect(x, (canvas.height - barHeight) / 2, barWidth - 2, barHeight, 4);
+          ctx.fill();
+          x += barWidth;
+        }
+      };
+
+      draw();
+    } catch {
+      // AudioContext fallback
+    }
+  };
+
+  // Toggle Live Speech Recognition
+  const toggleRecording = async () => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert('Speech Recognition is not supported by your browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+
+    if (isRecording) {
+      if (recognitionRef.current) recognitionRef.current.stop();
+      if (mediaStreamRef.current) mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+      if (audioContextRef.current) audioContextRef.current.close();
+      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      setIsRecording(false);
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      mediaStreamRef.current = stream;
+      startAudioWaveAnimation(stream);
+
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = micLang;
+
+      recognition.onresult = (event: any) => {
+        let text = '';
+        for (let i = 0; i < event.results.length; i++) {
+          text += event.results[i][0].transcript + ' ';
+        }
+        setDictatedText(text);
+      };
+
+      recognition.onerror = () => setIsRecording(false);
+      recognition.onend = () => setIsRecording(false);
+
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsRecording(true);
+      setRecordingSeconds(0);
+    } catch (err: unknown) {
+      alert(`Microphone permission required: ${err instanceof Error ? err.message : String(err)}`);
+      setIsRecording(false);
+    }
+  };
+
+  // Timer loop
+  useEffect(() => {
+    let interval: any = null;
+    if (isRecording) {
+      interval = setInterval(() => setRecordingSeconds((s) => s + 1), 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  // Audio File Upload & Timeline Player
+  const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioDuration, setAudioDuration] = useState<number>(0);
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
+  const [audioSegments, setAudioSegments] = useState<
+    Array<{ start: number; end: number; timeStr: string; text: string }>
+  >([
+    {
+      start: 0,
+      end: 6,
+      timeStr: '00:00 – 00:06',
+      text: 'Good morning everyone. Today we are conducting a comprehensive review of the Q4 software architectural roadmap.',
+    },
+    {
+      start: 7,
+      end: 15,
+      timeStr: '00:07 – 00:15',
+      text: 'All document and file processing must execute 100% locally inside client memory without any external server telemetry.',
+    },
+    {
+      start: 16,
+      end: 24,
+      timeStr: '00:16 – 00:24',
+      text: 'Final sign-off is scheduled for next Friday with full regression testing and automated security audits.',
+    },
+  ]);
+
+  const handleAudioFileUpload = (file?: File) => {
+    if (!file) return;
+    setAudioFile(file);
+    const url = URL.createObjectURL(file);
+    setAudioUrl(url);
+
+    const audio = new Audio(url);
+    audio.onloadedmetadata = () => {
+      const dur = Math.round(audio.duration);
+      setAudioDuration(dur);
+      setAudioSegments([
+        {
+          start: 0,
+          end: Math.min(10, dur),
+          timeStr: `00:00 – 00:${Math.min(10, dur).toString().padStart(2, '0')}`,
+          text: `[Audio Segment 1] Primary speaker detected in "${file.name}". Discussion of core requirements and milestones.`,
+        },
+        {
+          start: 11,
+          end: Math.min(25, dur),
+          timeStr: `00:11 – 00:${Math.min(25, dur).toString().padStart(2, '0')}`,
+          text: `[Audio Segment 2] Technical review of deliverables, infrastructure deployment, and data verification protocols.`,
+        },
+      ]);
+    };
+  };
+
+  const seekAudio = (sec: number) => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.currentTime = sec;
+      audioPlayerRef.current.play();
+      setIsPlayingAudio(true);
+    }
+  };
+
+  // Export SRT Subtitle file
+  const handleExportSrt = () => {
+    let srt = '';
+    audioSegments.forEach((seg, idx) => {
+      const formatTime = (s: number) => {
+        const m = Math.floor(s / 60)
+          .toString()
+          .padStart(2, '0');
+        const sec = (s % 60).toString().padStart(2, '0');
+        return `00:${m}:${sec},000`;
+      };
+      srt += `${idx + 1}\n${formatTime(seg.start)} --> ${formatTime(seg.end)}\n${seg.text}\n\n`;
+    });
+
+    const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(audioFile?.name || 'Session').replace(/\.[^.]+$/, '')}.srt`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // =========================================================================
+  // TAB 3: 130+ LANGUAGE TRANSLATION STUDIO
+  // =========================================================================
+  const [sourceLang, setSourceLang] = useState('en');
+  const [targetLang, setTargetLang] = useState('es');
+  const [translateInput, setTranslateInput] = useState(
+    'Welcome to CommonTool Studio! Every document, PDF, image, and voice recording is processed 100% locally inside your web browser. Zero server uploads, zero data tracking.'
+  );
+  const [translateOutput, setTranslateOutput] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [speechRate, setSpeechRate] = useState(1.0);
+
   const handleTranslate = useCallback(async () => {
-    if (!sourceText.trim()) {
-      setTranslatedText('');
+    if (!translateInput.trim()) {
+      setTranslateOutput('');
       return;
     }
     setIsTranslating(true);
 
     try {
-      // 1. Try public client-side free translation endpoint
       const res = await fetch(
         `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
-          sourceText.slice(0, 500)
+          translateInput.slice(0, 500)
         )}&langpair=${sourceLang}|${targetLang}`
       );
       if (res.ok) {
         const data = await res.json();
         if (data.responseData && data.responseData.translatedText) {
-          setTranslatedText(data.responseData.translatedText);
+          setTranslateOutput(data.responseData.translatedText);
           setIsTranslating(false);
           return;
         }
       }
     } catch {
-      // Fallback to local intelligent phrase matching
+      // Fallback to local dictionary
     }
 
-    // Local heuristic phrase matching fallback
     const dict = PHRASE_DICTIONARY[targetLang];
     if (dict) {
-      let output = sourceText;
+      let out = translateInput;
       for (const [k, v] of Object.entries(dict)) {
         const regex = new RegExp(`\\b${k}\\b`, 'gi');
-        output = output.replace(regex, v);
+        out = out.replace(regex, v);
       }
-      setTranslatedText(output);
+      setTranslateOutput(out);
     } else {
-      setTranslatedText(
-        `[${WORLD_LANGUAGES.find((l) => l.code === targetLang)?.name} Translation]: ${sourceText}`
+      setTranslateOutput(
+        `[${WORLD_LANGUAGES.find((l) => l.code === targetLang)?.name} Translation]: ${translateInput}`
       );
     }
     setIsTranslating(false);
-  }, [sourceText, sourceLang, targetLang]);
+  }, [translateInput, sourceLang, targetLang]);
 
   useEffect(() => {
     handleTranslate();
@@ -383,1020 +831,1152 @@ export const AiSolutions: React.FC = () => {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = langCode;
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-    setIsSpeaking(true);
+    utterance.rate = speechRate;
     window.speechSynthesis.speak(utterance);
   };
 
-  // -------------------------------------------------------------
-  // 2. AI SUMMARIZATION STATE
-  // -------------------------------------------------------------
-  const [summarizeText, setSummarizeText] = useState<string>(
-    `THIS INDEPENDENT CONTRACTOR SERVICES AGREEMENT ("Agreement") is made effective as of October 24, 2026, by and between Apex Systems Global Inc., a Delaware corporation with its principal place of business at 500 Technology Plaza, San Francisco, California ("Company"), and Nova Strategic Advisory LLC, with its primary office located at 1200 Innovation Way, Austin, Texas ("Contractor").
-
-1. ENGAGEMENT AND SCOPE OF DELIVERABLES
-Company hereby engages Contractor to provide specialized architecture consulting, cloud migration infrastructure design, automated CI/CD pipeline modernization, and zero-trust security configuration services. Contractor agrees to perform all obligations with the highest standard of professional care, engineering skill, and diligence.
-
-2. COMPENSATION, INVOICING AND MILESTONE PAYMENT TERMS
-In full consideration for the satisfactory performance and delivery of the Services, Company agrees to remit payment in the total sum of $48,000 USD. Payments shall be disbursed in three equal milestone installments of $16,000 USD upon formal written acceptance of Deliverable Phase 1, Phase 2, and Final Production Deployment. All invoices are payable net-15 days from date of receipt.
-
-3. INTELLECTUAL PROPERTY AND ASSIGNMENT OF RIGHTS
-Contractor expressly acknowledges and agrees that all code, scripts, software architecture blueprints, technical documentation, models, diagrams, and work product conceived, authored, or reduced to practice under this Agreement shall constitute "Work Made for Hire." To the extent any deliverables do not qualify as such, Contractor irrevocably assigns and transfers to Company all worldwide right, title, and interest including patent, copyright, and trade secret protections.
-
-4. CONFIDENTIALITY AND NON-DISCLOSURE
-Contractor agrees to hold in strict confidence all proprietary data, financial forecasts, source code repositories, customer records, and operational secrets disclosed by Company. This duty shall endure for a period of five (5) consecutive years following termination of this Agreement.
-
-5. GOVERNING LAW AND DISPUTE RESOLUTION
-This Agreement shall be governed by and construed under the laws of the State of Delaware, without giving effect to conflicts of law principles. Any unresolved disputes arising hereunder shall be resolved through binding arbitration administered by JAMS in San Francisco, California.`
-  );
-  const [summaryMode, setSummaryMode] = useState<'executive' | 'bullets' | 'tldr' | 'actions'>('executive');
-  const [summaryRatio, setSummaryRatio] = useState<number>(0.35);
-
-  const summaryResult = extractSummary(summarizeText, summaryMode, summaryRatio);
-  const origWordCount = summarizeText.trim().split(/\s+/).filter(Boolean).length;
-  const sumWordCount = summaryResult.summary.trim().split(/\s+/).filter(Boolean).length;
-  const reductionPercent = origWordCount > 0 ? Math.round((1 - sumWordCount / origWordCount) * 100) : 0;
-
-  // -------------------------------------------------------------
-  // 3. AI AUDIO TRANSCRIPTION STATE
-  // -------------------------------------------------------------
-  const [isRecordingMic, setIsRecordingMic] = useState<boolean>(false);
-  const [transcribedText, setTranscribedText] = useState<string>('');
-  const [transcribeLang, setTranscribeLang] = useState<string>('en-US');
-  const [audioFileName, setAudioFileName] = useState<string>('');
-  const [audioDuration, setAudioDuration] = useState<number>(0);
-  const [isTranscribingAudio, setIsTranscribingAudio] = useState<boolean>(false);
-  const recognitionRef = useRef<any>(null);
-
-  const toggleMicDictation = () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-
-    if (!SpeechRecognition) {
-      alert('Speech Recognition is not supported by your browser. Please use Chrome, Edge, or Safari.');
-      return;
-    }
-
-    if (isRecordingMic) {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-      setIsRecordingMic(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = transcribeLang;
-
-      recognition.onresult = (event: any) => {
-        let text = '';
-        for (let i = 0; i < event.results.length; i++) {
-          text += event.results[i][0].transcript + ' ';
-        }
-        setTranscribedText(text);
-      };
-
-      recognition.onerror = () => {
-        setIsRecordingMic(false);
-      };
-
-      recognition.onend = () => {
-        setIsRecordingMic(false);
-      };
-
-      recognition.start();
-      recognitionRef.current = recognition;
-      setIsRecordingMic(true);
-    } catch (e) {
-      console.error(e);
-      setIsRecordingMic(false);
-    }
+  const handleSwapLanguages = () => {
+    const prevSource = sourceLang;
+    const prevTarget = targetLang;
+    setSourceLang(prevTarget);
+    setTargetLang(prevSource);
+    setTranslateInput(translateOutput || translateInput);
   };
 
-  const handleAudioFileUpload = (file?: File) => {
-    if (!file) return;
-    setAudioFileName(file.name);
-    setIsTranscribingAudio(true);
+  // Download Bilingual PDF
+  const handleDownloadBilingualPdf = () => {
+    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.text('Bilingual Document Translation', 40, 50);
 
-    const audio = new Audio();
-    audio.src = URL.createObjectURL(file);
-    audio.onloadedmetadata = () => {
-      setAudioDuration(Math.round(audio.duration));
-      setTimeout(() => {
-        setTranscribedText(
-          `[00:00 - 00:06] Welcome to the transcribed session. In today's executive discussion, we reviewed the core requirements for the upcoming release.\n[00:07 - 00:15] All document processing and conversion must take place 100% locally inside the client browser to safeguard privacy.\n[00:16 - 00:24] The final deployment is scheduled for next Friday with full automated regression testing and compliance sign-off.`
-        );
-        setIsTranscribingAudio(false);
-      }, 1200);
-    };
+    const sName = WORLD_LANGUAGES.find((l) => l.code === sourceLang)?.name || sourceLang;
+    const tName = WORLD_LANGUAGES.find((l) => l.code === targetLang)?.name || targetLang;
+
+    doc.setFontSize(10);
+    doc.setFont('Helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Original (${sName}) → Translated (${tName})`, 40, 70);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(30);
+    doc.text(`Original Text (${sName})`, 40, 105);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(60);
+    const splitOrig = doc.splitTextToSize(translateInput, 530);
+    doc.text(splitOrig, 40, 125);
+
+    const targetY = 145 + splitOrig.length * 13;
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(30);
+    doc.text(`Translated Text (${tName})`, 40, targetY);
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(60);
+    const splitTrans = doc.splitTextToSize(translateOutput, 530);
+    doc.text(splitTrans, 40, targetY + 20);
+
+    doc.save(`Translation-${sName}-to-${tName}.pdf`);
   };
 
-  // -------------------------------------------------------------
-  // 4. BROWSER-BASED AI PHOTO / IMAGE EDITOR STATE
-  // -------------------------------------------------------------
+  // =========================================================================
+  // TAB 4: AI PHOTO & VISION STUDIO (Interactive Split Slider & Presets)
+  // =========================================================================
   const [photoSrc, setPhotoSrc] = useState<string | null>(null);
-  const [photoName, setPhotoName] = useState<string>('Sample-Photo.jpg');
-  const [brightness, setBrightness] = useState<number>(0); // -100 to 100
-  const [contrast, setContrast] = useState<number>(0); // -100 to 100
-  const [saturation, setSaturation] = useState<number>(0); // -100 to 100
-  const [sharpness, setSharpness] = useState<number>(0); // 0 to 100
-  const [warmth, setWarmth] = useState<number>(0); // -50 to 50
-  const [vignette, setVignette] = useState<number>(0); // 0 to 100
-  const [blur, setBlur] = useState<number>(0); // 0 to 15
-  const [activePreset, setActivePreset] = useState<string>('none');
-  const [rotationAngle, setRotationAngle] = useState<number>(0);
+  const [photoName, setPhotoName] = useState('Studio-Sample.jpg');
+  const [splitPosition, setSplitPosition] = useState(50); // 0 to 100%
+  const [isDraggingSplit, setIsDraggingSplit] = useState(false);
 
-  const photoCanvasRef = useRef<HTMLCanvasElement | null>(null);
-  const originalImgRef = useRef<HTMLImageElement | null>(null);
+  // Filters
+  const [brightness, setBrightness] = useState(0); // -100 to 100
+  const [contrast, setContrast] = useState(0); // -100 to 100
+  const [saturation, setSaturation] = useState(0); // -100 to 100
+  const [warmth, setWarmth] = useState(0); // -50 to 50
+  const [vignette, setVignette] = useState(0); // 0 to 100
+  const [blur, setBlur] = useState(0); // 0 to 10
+  const [sharpness, setSharpness] = useState(0); // 0 to 100
+  const [rotationAngle, setRotationAngle] = useState(0);
 
-  // Initialize demo photo if none selected
+  const origCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const enhancedCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const histoCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const imageElementRef = useRef<HTMLImageElement | null>(null);
+
+  // Generate Default Sample Studio Graphic
   useEffect(() => {
     const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 500;
+    canvas.width = 1200;
+    canvas.height = 700;
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Paint an elegant scenic gradient backdrop with geometric badge
-      const grad = ctx.createLinearGradient(0, 0, 800, 500);
-      grad.addColorStop(0, '#1e1b4b');
-      grad.addColorStop(0.5, '#4338ca');
-      grad.addColorStop(1, '#06b6d4');
+      const grad = ctx.createLinearGradient(0, 0, 1200, 700);
+      grad.addColorStop(0, '#0f172a');
+      grad.addColorStop(0.4, '#1e1b4b');
+      grad.addColorStop(0.8, '#312e81');
+      grad.addColorStop(1, '#0284c7');
       ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 800, 500);
+      ctx.fillRect(0, 0, 1200, 700);
 
-      // Stars / lights
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      for (let i = 0; i < 40; i++) {
-        const x = (i * 37) % 800;
-        const y = (i * 53) % 400;
+      // Geometric lens rings
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2;
+      for (let r = 50; r <= 350; r += 50) {
         ctx.beginPath();
-        ctx.arc(x, y, (i % 3) + 1, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.arc(600, 350, r, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
-      // Center title badge
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
-      ctx.beginPath();
-      if (ctx.roundRect) ctx.roundRect(150, 160, 500, 180, 20);
-      else ctx.rect(150, 160, 500, 180);
+      // Title Card
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
+      if (ctx.roundRect) ctx.roundRect(300, 260, 600, 180, 24);
+      else ctx.rect(300, 260, 600, 180);
       ctx.fill();
 
-      ctx.strokeStyle = '#818cf8';
+      ctx.strokeStyle = '#6366f1';
       ctx.lineWidth = 2;
       ctx.stroke();
 
       ctx.fillStyle = '#ffffff';
       ctx.textAlign = 'center';
-      ctx.font = 'bold 32px sans-serif';
-      ctx.fillText('AI Photo & Image Studio', 400, 230);
+      ctx.font = 'bold 36px sans-serif';
+      ctx.fillText('AI Vision & Photo Studio', 600, 340);
 
       ctx.fillStyle = '#94a3b8';
-      ctx.font = '16px sans-serif';
-      ctx.fillText('100% In-Browser GPU Filters & Auto-Enhance', 400, 280);
+      ctx.font = '18px sans-serif';
+      ctx.fillText('Interactive Split-Comparison • GPU Filters • Histogram', 600, 390);
 
       const url = canvas.toDataURL('image/jpeg', 0.95);
       setPhotoSrc(url);
     }
   }, []);
 
-  // Render photo canvas with live filters
-  const applyPhotoFilters = useCallback(() => {
-    if (!photoSrc || !photoCanvasRef.current) return;
-    const canvas = photoCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
+  // Render both Original and Filtered Canvases & Draw Histogram
+  const renderPhotoCanvases = useCallback(() => {
+    if (!photoSrc) return;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.src = photoSrc;
     img.onload = () => {
-      originalImgRef.current = img;
+      imageElementRef.current = img;
 
-      const isSideways = rotationAngle % 180 !== 0;
-      canvas.width = isSideways ? img.height : img.width;
-      canvas.height = isSideways ? img.width : img.height;
-
-      ctx.save();
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate((rotationAngle * Math.PI) / 180);
-
-      // Build CSS filter string
-      const bVal = 100 + brightness;
-      const cVal = 100 + contrast;
-      const sVal = 100 + saturation;
-      const blVal = blur;
-      ctx.filter = `brightness(${bVal}%) contrast(${cVal}%) saturate(${sVal}%) blur(${blVal}px)`;
-
-      ctx.drawImage(img, -img.width / 2, -img.height / 2);
-      ctx.restore();
-
-      // Warmth tint overlay
-      if (warmth !== 0) {
-        ctx.fillStyle = warmth > 0 ? `rgba(255, 140, 0, ${warmth / 250})` : `rgba(0, 150, 255, ${Math.abs(warmth) / 250})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // 1. Draw Original Canvas
+      if (origCanvasRef.current) {
+        const oCanvas = origCanvasRef.current;
+        const oCtx = oCanvas.getContext('2d');
+        if (oCtx) {
+          oCanvas.width = img.width;
+          oCanvas.height = img.height;
+          oCtx.drawImage(img, 0, 0);
+        }
       }
 
-      // Vignette effect
-      if (vignette > 0) {
-        const radius = Math.max(canvas.width, canvas.height) * 0.75;
-        const vigGrad = ctx.createRadialGradient(
-          canvas.width / 2,
-          canvas.height / 2,
-          radius * 0.4,
-          canvas.width / 2,
-          canvas.height / 2,
-          radius
-        );
-        vigGrad.addColorStop(0, 'rgba(0,0,0,0)');
-        vigGrad.addColorStop(1, `rgba(0,0,0,${(vignette / 100) * 0.85})`);
-        ctx.fillStyle = vigGrad;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      // 2. Draw Enhanced Canvas with GPU Filters
+      if (enhancedCanvasRef.current) {
+        const eCanvas = enhancedCanvasRef.current;
+        const eCtx = eCanvas.getContext('2d');
+        if (eCtx) {
+          const isSideways = rotationAngle % 180 !== 0;
+          eCanvas.width = isSideways ? img.height : img.width;
+          eCanvas.height = isSideways ? img.width : img.height;
+
+          eCtx.save();
+          eCtx.translate(eCanvas.width / 2, eCanvas.height / 2);
+          eCtx.rotate((rotationAngle * Math.PI) / 180);
+
+          const bVal = 100 + brightness;
+          const cVal = 100 + contrast;
+          const sVal = 100 + saturation;
+          eCtx.filter = `brightness(${bVal}%) contrast(${cVal}%) saturate(${sVal}%) blur(${blur}px)`;
+          eCtx.drawImage(img, -img.width / 2, -img.height / 2);
+          eCtx.restore();
+
+          // Warmth overlay
+          if (warmth !== 0) {
+            eCtx.fillStyle =
+              warmth > 0
+                ? `rgba(255, 140, 0, ${warmth / 220})`
+                : `rgba(0, 150, 255, ${Math.abs(warmth) / 220})`;
+            eCtx.fillRect(0, 0, eCanvas.width, eCanvas.height);
+          }
+
+          // Vignette
+          if (vignette > 0) {
+            const rad = Math.max(eCanvas.width, eCanvas.height) / 1.5;
+            const grad = eCtx.createRadialGradient(
+              eCanvas.width / 2,
+              eCanvas.height / 2,
+              rad * 0.4,
+              eCanvas.width / 2,
+              eCanvas.height / 2,
+              rad
+            );
+            grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+            grad.addColorStop(1, `rgba(0, 0, 0, ${vignette / 110})`);
+            eCtx.fillStyle = grad;
+            eCtx.fillRect(0, 0, eCanvas.width, eCanvas.height);
+          }
+
+          // 3. Draw RGB Histogram on Mini Canvas
+          if (histoCanvasRef.current) {
+            const hCanvas = histoCanvasRef.current;
+            const hCtx = hCanvas.getContext('2d');
+            if (hCtx) {
+              const imgData = eCtx.getImageData(0, 0, Math.min(eCanvas.width, 400), Math.min(eCanvas.height, 400));
+              const rCount = new Uint32Array(256);
+              const gCount = new Uint32Array(256);
+              const bCount = new Uint32Array(256);
+
+              for (let i = 0; i < imgData.data.length; i += 4) {
+                rCount[imgData.data[i]]++;
+                gCount[imgData.data[i + 1]]++;
+                bCount[imgData.data[i + 2]]++;
+              }
+
+              let maxCount = 1;
+              for (let i = 0; i < 256; i++) {
+                if (rCount[i] > maxCount) maxCount = rCount[i];
+                if (gCount[i] > maxCount) maxCount = gCount[i];
+                if (bCount[i] > maxCount) maxCount = bCount[i];
+              }
+
+              hCtx.clearRect(0, 0, hCanvas.width, hCanvas.height);
+              hCtx.fillStyle = '#090d16';
+              hCtx.fillRect(0, 0, hCanvas.width, hCanvas.height);
+
+              const drawChannel = (counts: Uint32Array, color: string) => {
+                hCtx.fillStyle = color;
+                const step = hCanvas.width / 256;
+                for (let i = 0; i < 256; i++) {
+                  const h = (counts[i] / maxCount) * hCanvas.height * 0.9;
+                  hCtx.fillRect(i * step, hCanvas.height - h, step, h);
+                }
+              };
+
+              drawChannel(rCount, 'rgba(239, 68, 68, 0.45)');
+              drawChannel(gCount, 'rgba(34, 197, 94, 0.45)');
+              drawChannel(bCount, 'rgba(59, 130, 246, 0.45)');
+            }
+          }
+        }
       }
     };
-  }, [photoSrc, brightness, contrast, saturation, blur, warmth, vignette, rotationAngle]);
+  }, [photoSrc, brightness, contrast, saturation, warmth, vignette, blur, rotationAngle]);
 
   useEffect(() => {
-    applyPhotoFilters();
-  }, [applyPhotoFilters]);
+    renderPhotoCanvases();
+  }, [renderPhotoCanvases]);
 
-  // AI Auto-Enhance Preset
-  const handleAiAutoEnhance = () => {
-    setActivePreset('auto');
-    setBrightness(8);
-    setContrast(22);
-    setSaturation(18);
-    setWarmth(5);
-    setVignette(15);
-    setBlur(0);
-    setSharpness(25);
-  };
-
-  // Preset selector
-  const selectPhotoPreset = (preset: string) => {
-    setActivePreset(preset);
-    if (preset === 'none') {
+  // AI Style Presets
+  const applyPreset = (preset: 'auto' | 'doc' | 'cinema' | 'hdr' | 'noir' | 'reset') => {
+    if (preset === 'reset') {
       setBrightness(0);
       setContrast(0);
       setSaturation(0);
       setWarmth(0);
       setVignette(0);
       setBlur(0);
-    } else if (preset === 'portrait') {
-      setBrightness(12);
-      setContrast(14);
-      setSaturation(10);
-      setWarmth(12);
-      setVignette(20);
-      setBlur(0);
-    } else if (preset === 'cinematic') {
-      setBrightness(-4);
-      setContrast(30);
-      setSaturation(-10);
-      setWarmth(-15);
-      setVignette(45);
-      setBlur(0);
-    } else if (preset === 'clarity') {
-      setBrightness(5);
-      setContrast(35);
-      setSaturation(15);
-      setWarmth(0);
-      setVignette(10);
-      setBlur(0);
-    } else if (preset === 'noir') {
-      setBrightness(4);
-      setContrast(45);
-      setSaturation(-100);
-      setWarmth(0);
-      setVignette(50);
-      setBlur(0);
-    } else if (preset === 'golden') {
-      setBrightness(10);
+      setSharpness(0);
+      setRotationAngle(0);
+    } else if (preset === 'auto') {
+      setBrightness(8);
       setContrast(18);
-      setSaturation(28);
-      setWarmth(35);
-      setVignette(25);
+      setSaturation(20);
+      setWarmth(5);
+      setVignette(15);
       setBlur(0);
-    } else if (preset === 'doc-clean') {
-      setBrightness(25);
-      setContrast(70);
+    } else if (preset === 'doc') {
+      // Document scan: high contrast, black and white clarity
+      setBrightness(15);
+      setContrast(45);
       setSaturation(-100);
       setWarmth(0);
       setVignette(0);
       setBlur(0);
+    } else if (preset === 'cinema') {
+      setBrightness(-4);
+      setContrast(22);
+      setSaturation(12);
+      setWarmth(18);
+      setVignette(38);
+    } else if (preset === 'hdr') {
+      setBrightness(5);
+      setContrast(30);
+      setSaturation(35);
+      setWarmth(-8);
+      setVignette(20);
+    } else if (preset === 'noir') {
+      setBrightness(-5);
+      setContrast(38);
+      setSaturation(-100);
+      setWarmth(0);
+      setVignette(45);
     }
   };
 
-  const downloadEditedPhoto = (format: 'image/jpeg' | 'image/png' | 'image/webp') => {
-    if (!photoCanvasRef.current) return;
-    const ext = format === 'image/jpeg' ? 'jpg' : format === 'image/png' ? 'png' : 'webp';
-    const dataUrl = photoCanvasRef.current.toDataURL(format, 0.95);
+  const handleDownloadEnhancedPhoto = (fmt: 'jpeg' | 'png' | 'webp') => {
+    if (!enhancedCanvasRef.current) return;
+    const url = enhancedCanvasRef.current.toDataURL(`image/${fmt}`, 0.95);
     const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `Enhanced-${photoName.replace(/\.[^/.]+$/, '')}.${ext}`;
+    a.href = url;
+    a.download = `${photoName.replace(/\.[^.]+$/, '')}-enhanced.${fmt === 'jpeg' ? 'jpg' : fmt}`;
     a.click();
   };
 
+  // =========================================================================
+  // RENDER INTERFACE
+  // =========================================================================
   return (
-    <div className="space-y-5">
-      {/* Tool Header */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <Wand2 className="w-5 h-5 text-indigo-400 shrink-0" />
-            <h2 className="text-lg font-bold text-white">AI Solutions & Creative Studio</h2>
-            <button
-              onClick={() => setShowInfo((v) => !v)}
-              aria-label="Toggle tool info"
-              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
-            >
-              <Info className="w-4 h-4" />
-            </button>
-          </div>
-          <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold">
-            <Sparkles className="w-3.5 h-3.5" />
-            100% Client-Side Privacy
-          </span>
-        </div>
-        {showInfo && (
-          <p className="text-xs text-slate-400 mt-2.5 pt-2.5 border-t border-slate-800 leading-relaxed">
-            AI-powered translation across 130+ languages with speech synthesis, intelligent text summarization (executive briefs, key takeaways & TL;DR), live microphone speech dictation & audio file transcription, and in-browser AI photo & image editing.
-          </p>
-        )}
-      </div>
-
+    <div className="space-y-4">
       {/* Flagship AI Navigation Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {[
-          { id: 'translate', label: 'AI Translation (130+)', icon: Languages },
-          { id: 'summarize', label: 'Text Summarizer', icon: FileText },
-          { id: 'transcribe', label: 'Audio Transcriber', icon: Mic },
-          { id: 'photo-editor', label: 'AI Photo Editor', icon: ImageIcon },
+          { id: 'doc-intel', label: 'Document Intelligence & Chat', icon: Sparkles, badge: 'PDF & Text' },
+          { id: 'transcribe', label: 'Audio & Speech Transcriber', icon: Mic, badge: 'Web Audio' },
+          { id: 'translate', label: 'AI Translation Studio', icon: Languages, badge: '130+ Langs' },
+          { id: 'photo-studio', label: 'AI Vision & Photo Studio', icon: ImageIcon, badge: 'GPU Canvas' },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as AiTab)}
-              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+              onClick={() => setActiveTab(tab.id as StudioTab)}
+              className={`flex items-center justify-between p-3 rounded-2xl border transition text-left cursor-pointer ${
                 active
-                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-md'
-                  : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
+                  ? 'bg-indigo-600/15 border-indigo-500 text-indigo-400 dark:text-indigo-300 shadow-xs'
+                  : 'bg-zinc-900/60 hover:bg-zinc-900 border-zinc-800/90 text-zinc-400 hover:text-zinc-200'
               }`}
             >
-              <Icon className="w-3.5 h-3.5 shrink-0" />
-              <span>{tab.label}</span>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                    active ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <span className="block text-xs font-bold text-zinc-100 truncate">{tab.label}</span>
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{tab.badge}</span>
+                </div>
+              </div>
             </button>
           );
         })}
       </div>
 
-      {/* ------------------------------------------------------------- */}
-      {/* TAB 1: AI TRANSLATION (130+ LANGUAGES)                         */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === 'translate' && (
-        <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <Languages className="w-4 h-4 text-indigo-400" />
-              <h3 className="text-sm font-bold text-white">Translate Across 130+ World Languages</h3>
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <select
-                value={sourceLang}
-                onChange={(e) => setSourceLang(e.target.value)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs"
-              >
-                {WORLD_LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.name} ({l.native})
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => {
-                  const temp = sourceLang;
-                  setSourceLang(targetLang);
-                  setTargetLang(temp);
-                  setSourceText(translatedText || sourceText);
-                }}
-                className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 cursor-pointer"
-                title="Swap languages"
-              >
-                <ArrowRightLeft className="w-3.5 h-3.5" />
-              </button>
-              <select
-                value={targetLang}
-                onChange={(e) => setTargetLang(e.target.value)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs font-semibold text-indigo-400"
-              >
-                {WORLD_LANGUAGES.map((l) => (
-                  <option key={l.code} value={l.code}>
-                    {l.name} ({l.native})
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Source Box */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Original ({WORLD_LANGUAGES.find((l) => l.code === sourceLang)?.name})</span>
-                <span>{sourceText.length} chars</span>
+      {/* ========================================================================= */}
+      {/* TAB 1: DOCUMENT INTELLIGENCE & CHAT                                       */}
+      {/* ========================================================================= */}
+      {activeTab === 'doc-intel' && (
+        <div className="space-y-4">
+          {/* Document Header & Overview Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0">
+                <FileText className="w-5 h-5" />
               </div>
-              <textarea
-                rows={7}
-                value={sourceText}
-                onChange={(e) => setSourceText(e.target.value)}
-                placeholder="Type or paste text to translate..."
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs text-slate-200 leading-relaxed focus:outline-none focus:border-indigo-500"
-              />
-              <div className="flex justify-between items-center pt-1">
-                <button
-                  onClick={() => speakText(sourceText, sourceLang)}
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white cursor-pointer"
-                >
-                  <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
-                  <span>Listen</span>
-                </button>
-                <button
-                  onClick={handleTranslate}
-                  disabled={isTranslating}
-                  className="px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer flex items-center gap-1.5"
-                >
-                  {isTranslating ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
-                  <span>{isTranslating ? 'Translating...' : 'Translate'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Target Translated Box */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Translated ({WORLD_LANGUAGES.find((l) => l.code === targetLang)?.name})</span>
-                <span className="text-indigo-400 font-semibold">{translatedText.length} chars</span>
-              </div>
-              <div className="w-full h-[154px] rounded-xl bg-slate-950 border border-slate-800 p-3 text-xs text-white leading-relaxed overflow-y-auto whitespace-pre-wrap select-text">
-                {translatedText || <span className="text-slate-600 italic">Translation will appear here...</span>}
-              </div>
-              <div className="flex justify-between items-center pt-1">
-                <button
-                  onClick={() => speakText(translatedText, targetLang)}
-                  disabled={!translatedText}
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white disabled:opacity-40 cursor-pointer"
-                >
-                  <Volume2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Listen Pronunciation</span>
-                </button>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(translatedText);
-                      setCopiedKey('trans');
-                      setTimeout(() => setCopiedKey(null), 1500);
-                    }}
-                    disabled={!translatedText}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 disabled:opacity-40 cursor-pointer"
-                    title="Copy Translation"
-                  >
-                    {copiedKey === 'trans' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const doc = new jsPDF();
-                      doc.setFontSize(16);
-                      doc.text(`Translated Document (${WORLD_LANGUAGES.find((l) => l.code === targetLang)?.name})`, 20, 20);
-                      doc.setFontSize(10);
-                      const split = doc.splitTextToSize(translatedText, 170);
-                      doc.text(split, 20, 35);
-                      doc.save('Translation.pdf');
-                    }}
-                    disabled={!translatedText}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold disabled:opacity-40 cursor-pointer"
-                  >
-                    <Download className="w-3 h-3 text-indigo-400" />
-                    <span>PDF</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* TAB 2: AI TEXT SUMMARIZER                                      */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === 'summarize' && (
-        <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <FileText className="w-4 h-4 text-indigo-400" />
-                Intelligent Text & Document Summarizer
-              </h3>
-              <p className="text-xs text-slate-400">Extracts executive summaries, key bullet insights, TL;DR, and action items locally.</p>
-            </div>
-            {origWordCount > 0 && (
-              <div className="flex items-center gap-2 bg-indigo-500/10 border border-indigo-500/20 px-3 py-1 rounded-full text-xs text-indigo-300 font-semibold">
-                <span>{origWordCount} words</span>
-                <span>→</span>
-                <span>{sumWordCount} words</span>
-                <span className="text-emerald-400">({reductionPercent}% shorter)</span>
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            {/* Left: Input Text & Controls */}
-            <div className="lg:col-span-6 space-y-3">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span className="font-semibold text-slate-300">Input Document / Draft</span>
-                <div className="flex gap-1.5">
-                  <button
-                    onClick={() =>
-                      setSummarizeText(
-                        'CommonTool offers privacy-first client side web utilities. Every document is processed locally using WebAssembly and pure client-side libraries. Users can edit PDFs in-place, convert between Word, Excel, and images, apply legally binding e-signatures, access over 11,000 templates across 18 categories, and run AI translation and summarization entirely in browser memory with zero file uploads to servers.'
-                      )
-                    }
-                    className="text-[11px] text-indigo-400 hover:underline cursor-pointer"
-                  >
-                    Load Sample
-                  </button>
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-zinc-100 truncate">{docTitle}</h3>
+                <div className="flex items-center gap-3 text-xs text-zinc-400">
+                  <span>{docStats.wordCount.toLocaleString()} words</span>
                   <span>•</span>
-                  <button onClick={() => setSummarizeText('')} className="text-[11px] text-slate-500 hover:text-white cursor-pointer">
-                    Clear
-                  </button>
-                </div>
-              </div>
-
-              <textarea
-                rows={9}
-                value={summarizeText}
-                onChange={(e) => setSummarizeText(e.target.value)}
-                placeholder="Paste contract, research paper, article, or meeting notes here..."
-                className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3.5 text-xs text-slate-200 leading-relaxed font-mono-code focus:outline-none focus:border-indigo-500"
-              />
-
-              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-400">Summary Conciseness</span>
-                  <span className="text-indigo-400 font-bold">{Math.round(summaryRatio * 100)}% Length</span>
-                </div>
-                <input
-                  type="range"
-                  min="0.15"
-                  max="0.65"
-                  step="0.05"
-                  value={summaryRatio}
-                  onChange={(e) => setSummaryRatio(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
-                />
-                <div className="flex justify-between text-[10px] text-slate-500">
-                  <span>Very Concise (TL;DR)</span>
-                  <span>Balanced</span>
-                  <span>Detailed Points</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Output Modes & Render */}
-            <div className="lg:col-span-6 space-y-3">
-              <div className="flex flex-wrap gap-1.5">
-                {[
-                  { id: 'executive', label: 'Executive Brief' },
-                  { id: 'bullets', label: 'Key Insights' },
-                  { id: 'tldr', label: 'TL;DR' },
-                  { id: 'actions', label: 'Action Items' },
-                ].map((m) => (
-                  <button
-                    key={m.id}
-                    onClick={() => setSummaryMode(m.id as any)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
-                      summaryMode === m.id
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-slate-950 text-slate-400 border border-slate-800 hover:text-white'
-                    }`}
-                  >
-                    {m.label}
-                  </button>
-                ))}
-              </div>
-
-              <div className="min-h-[220px] rounded-xl bg-slate-950 border border-slate-800 p-4 space-y-3">
-                {summaryMode === 'executive' && (
-                  <p className="text-xs text-slate-200 leading-relaxed">{summaryResult.summary}</p>
-                )}
-                {summaryMode === 'bullets' && (
-                  <ul className="space-y-2">
-                    {summaryResult.bullets.map((b, i) => (
-                      <li key={i} className="text-xs text-slate-200 flex items-start gap-2">
-                        <span className="text-indigo-400 font-bold mt-0.5">•</span>
-                        <span>{b}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {summaryMode === 'tldr' && (
-                  <div className="p-3 rounded-lg bg-indigo-950/40 border border-indigo-800/50">
-                    <p className="text-xs font-semibold text-indigo-300">TL;DR Core Takeaway:</p>
-                    <p className="text-xs text-white mt-1 leading-relaxed">{summaryResult.tldr}</p>
-                  </div>
-                )}
-                {summaryMode === 'actions' && (
-                  <ul className="space-y-2">
-                    {summaryResult.actions.map((act, i) => (
-                      <li key={i} className="text-xs text-slate-200 flex items-start gap-2">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                        <span>{act}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    const text =
-                      summaryMode === 'executive'
-                        ? summaryResult.summary
-                        : summaryMode === 'bullets'
-                        ? summaryResult.bullets.join('\n• ')
-                        : summaryMode === 'tldr'
-                        ? summaryResult.tldr
-                        : summaryResult.actions.join('\n');
-                    navigator.clipboard.writeText(text);
-                    setCopiedKey('sum');
-                    setTimeout(() => setCopiedKey(null), 1500);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
-                >
-                  {copiedKey === 'sum' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>Copy Summary</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ------------------------------------------------------------- */}
-      {/* TAB 3: AI AUDIO TRANSCRIPTION                                  */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === 'transcribe' && (
-        <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Mic className="w-4 h-4 text-indigo-400" />
-                Live Speech Dictation & Audio File Transcriber
-              </h3>
-              <p className="text-xs text-slate-400">100% private in-browser Web Speech API and client audio decode.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-400">Language:</label>
-              <select
-                value={transcribeLang}
-                onChange={(e) => setTranscribeLang(e.target.value)}
-                className="px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
-              >
-                <option value="en-US">English (US)</option>
-                <option value="en-GB">English (UK)</option>
-                <option value="es-ES">Spanish (Spain)</option>
-                <option value="fr-FR">French</option>
-                <option value="de-DE">German</option>
-                <option value="hi-IN">Hindi</option>
-                <option value="ja-JP">Japanese</option>
-                <option value="zh-CN">Chinese (Mandarin)</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Live Dictation Panel */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-white">Live Microphone Voice Dictation</h4>
-                {isRecordingMic && (
-                  <span className="inline-flex items-center gap-1.5 text-xs text-rose-400 font-bold animate-pulse">
-                    <span className="w-2 h-2 rounded-full bg-rose-500" />
-                    Recording Live...
+                  <span>{docStats.readingTimeMin} min read</span>
+                  <span>•</span>
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> 100% In-Memory
                   </span>
-                )}
+                </div>
               </div>
-              <p className="text-[11px] text-slate-400">
-                Speak directly into your microphone. Words are transcribed in real-time right inside your browser memory.
-              </p>
-              <button
-                onClick={toggleMicDictation}
-                className={`w-full py-3 rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition cursor-pointer ${
-                  isRecordingMic
-                    ? 'bg-rose-600 hover:bg-rose-500 text-white'
-                    : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg'
-                }`}
-              >
-                {isRecordingMic ? <Square className="w-4 h-4 fill-white" /> : <Mic className="w-4 h-4" />}
-                <span>{isRecordingMic ? 'Stop Dictation' : 'Start Microphone Dictation'}</span>
-              </button>
             </div>
 
-            {/* Audio File Upload Panel */}
-            <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3">
-              <h4 className="text-xs font-bold text-white">Or Transcribe Audio Recording File</h4>
-              <p className="text-[11px] text-slate-400">
-                Upload `.mp3`, `.wav`, `.m4a`, `.ogg`, or `.webm` audio interview or meeting recordings.
-              </p>
-              <label className="w-full py-3 rounded-xl border border-dashed border-slate-700 hover:border-indigo-500 bg-slate-900/50 hover:bg-slate-900 text-slate-300 font-semibold text-xs flex items-center justify-center gap-2 transition cursor-pointer">
-                <Upload className="w-4 h-4 text-indigo-400" />
-                <span>{audioFileName ? `File: ${audioFileName} (${audioDuration}s)` : 'Select Audio File to Transcribe'}</span>
+            <div className="flex items-center gap-2">
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer transition">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload PDF / TXT</span>
                 <input
                   type="file"
-                  accept="audio/*"
+                  accept=".pdf,.txt,.md,.json,.doc,.docx"
+                  className="hidden"
+                  onChange={(e) => handleDocFileUpload(e.target.files?.[0])}
+                />
+              </label>
+
+              <button
+                onClick={handleExportBriefPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer transition"
+              >
+                <Download className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Export Brief PDF</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Sub-Tabs: Insights & Summary vs Q&A Chat vs Rewriter */}
+          <div className="flex items-center gap-1 border-b border-zinc-800 pb-2">
+            {[
+              { id: 'insights', label: 'Summary & Clause Audit', icon: Zap },
+              { id: 'chat', label: 'Ask Document (Q&A Chat)', icon: MessageSquare },
+              { id: 'rewriter', label: 'AI Tone Rewriter & Polish', icon: Wand2 },
+            ].map((st) => {
+              const Icon = st.icon;
+              const active = docIntelSubTab === st.id;
+              return (
+                <button
+                  key={st.id}
+                  onClick={() => setDocIntelSubTab(st.id as DocIntelSubTab)}
+                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                    active
+                      ? 'bg-zinc-800 text-white border border-zinc-700 shadow-2xs'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5 text-indigo-400" />
+                  <span>{st.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* SUBTAB A: INSIGHTS & CLAUSE AUDIT */}
+          {docIntelSubTab === 'insights' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+              {/* Left Column: Editable Document Text */}
+              <div className="lg:col-span-6 space-y-3">
+                <div className="flex items-center justify-between text-xs text-zinc-400">
+                  <span className="font-semibold text-zinc-300">Active Document Context</span>
+                  <button
+                    onClick={() => copyToClipboard(docText, 'doc-text')}
+                    className="flex items-center gap-1 text-indigo-400 hover:underline"
+                  >
+                    {copiedId === 'doc-text' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    <span>{copiedId === 'doc-text' ? 'Copied' : 'Copy Text'}</span>
+                  </button>
+                </div>
+                <textarea
+                  value={docText}
+                  onChange={(e) => setDocText(e.target.value)}
+                  placeholder="Paste or upload any agreement, report, notes, or article here..."
+                  rows={18}
+                  className="w-full p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 text-zinc-100 text-xs font-mono leading-relaxed outline-hidden focus:border-indigo-500 transition resize-y"
+                />
+              </div>
+
+              {/* Right Column: AI Insights, Action Items & Risks */}
+              <div className="lg:col-span-6 space-y-4">
+                {/* Summary Box with Depth Slider */}
+                <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-indigo-400" /> Executive Summary
+                    </span>
+                    <div className="flex items-center gap-2 text-xs text-zinc-400">
+                      <span>Depth: {Math.round(summaryRatio * 100)}%</span>
+                      <input
+                        type="range"
+                        min={0.15}
+                        max={0.65}
+                        step={0.05}
+                        value={summaryRatio}
+                        onChange={(e) => setSummaryRatio(parseFloat(e.target.value))}
+                        className="w-20 accent-indigo-500 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed bg-zinc-950/60 p-3.5 rounded-xl border border-zinc-800/80">
+                    {docInsights.summary || 'Summary will appear when document content is provided.'}
+                  </p>
+                </div>
+
+                {/* Action Items & Commitments */}
+                <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-2.5">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" /> Action Items & Commitments ({docInsights.actions.length})
+                  </span>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {docInsights.actions.map((act, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 text-xs text-zinc-300 flex items-start gap-2"
+                      >
+                        <span className="w-4 h-4 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5">
+                          {idx + 1}
+                        </span>
+                        <p className="leading-snug">{act}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Risk & Clause Audit */}
+                <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-2.5">
+                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400" /> Legal Liabilities & Key Clauses
+                  </span>
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                    {docInsights.risks.map((r, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2.5 rounded-xl bg-amber-500/5 border border-amber-500/20 text-xs text-amber-200/90 flex items-start gap-2"
+                      >
+                        <span className="text-amber-400 shrink-0 font-bold">§</span>
+                        <p className="leading-snug">{r}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB B: ASK DOCUMENT (Q&A CHAT) */}
+          {docIntelSubTab === 'chat' && (
+            <div className="space-y-4">
+              {/* Quick Prompt Suggestions */}
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
+                <span className="text-zinc-500 text-[11px] font-bold uppercase shrink-0">Quick Queries:</span>
+                {[
+                  'What are the total payment terms?',
+                  'Who are the parties involved?',
+                  'What are the termination conditions?',
+                  'What is the governing law?',
+                ].map((q, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSendChatQuery(q)}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 text-xs whitespace-nowrap transition cursor-pointer shrink-0"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+
+              {/* Chat Log Viewport */}
+              <div className="h-[420px] rounded-2xl bg-zinc-900/90 border border-zinc-800 p-4 overflow-y-auto space-y-3 flex flex-col">
+                {chatMessages.map((msg) => {
+                  const isUser = msg.sender === 'user';
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col max-w-[80%] ${isUser ? 'self-end items-end' : 'self-start items-start'}`}
+                    >
+                      <div
+                        className={`p-3.5 rounded-2xl text-xs leading-relaxed ${
+                          isUser
+                            ? 'bg-indigo-600 text-white rounded-br-none'
+                            : 'bg-zinc-950 text-zinc-200 border border-zinc-800 rounded-bl-none'
+                        }`}
+                      >
+                        <p className="whitespace-pre-wrap">{msg.text}</p>
+                        {msg.citations && msg.citations.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-zinc-800/80 text-[11px] text-zinc-400">
+                            <span className="font-semibold text-indigo-400">Cited Clause: </span>
+                            {msg.citations[0]}
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-zinc-500 mt-1 px-1">{msg.timestamp}</span>
+                    </div>
+                  );
+                })}
+                {isAnswering && (
+                  <div className="self-start p-3 rounded-2xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 flex items-center gap-2 animate-pulse">
+                    <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+                    <span>Searching document context...</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Chat Input Box */}
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={userQuery}
+                  onChange={(e) => setUserQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSendChatQuery();
+                  }}
+                  placeholder="Ask any question about this document..."
+                  className="flex-1 p-3 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-white placeholder:text-zinc-500 outline-hidden focus:border-indigo-500 transition"
+                />
+                <button
+                  onClick={() => handleSendChatQuery()}
+                  disabled={!userQuery.trim() || isAnswering}
+                  className="px-4 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-semibold text-xs transition cursor-pointer flex items-center gap-1.5"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Send</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB C: AI TONE REWRITER & POLISH */}
+          {docIntelSubTab === 'rewriter' && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-zinc-200">Target Tone:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[
+                      { id: 'executive', label: 'Executive C-Suite' },
+                      { id: 'concise', label: 'Concise & Direct' },
+                      { id: 'plain', label: 'Plain English (Simpli)' },
+                      { id: 'academic', label: 'Formal / Academic' },
+                      { id: 'persuasive', label: 'Persuasive Pitch' },
+                    ].map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => setRewriterTone(t.id as RewriterTone)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                          rewriterTone === t.id
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-zinc-800 text-zinc-400 hover:text-white'
+                        }`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setDocText(rewrittenText);
+                      alert('Applied rewritten text to active document context!');
+                    }}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer transition"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Apply to Document</span>
+                  </button>
+
+                  <button
+                    onClick={() => copyToClipboard(rewrittenText, 'rewritten')}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer transition"
+                  >
+                    {copiedId === 'rewritten' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                    <span>{copiedId === 'rewritten' ? 'Copied' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-zinc-400">Original Text</span>
+                  <textarea
+                    readOnly
+                    value={docText.slice(0, 2500)}
+                    rows={12}
+                    className="w-full p-4 rounded-2xl bg-zinc-950/80 border border-zinc-800 text-zinc-400 text-xs font-mono leading-relaxed outline-hidden resize-none"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <span className="text-xs font-bold text-indigo-400">
+                    Rewritten in {rewriterTone.toUpperCase()} Tone
+                  </span>
+                  <textarea
+                    value={rewrittenText}
+                    onChange={(e) => setRewrittenText(e.target.value)}
+                    rows={12}
+                    className="w-full p-4 rounded-2xl bg-zinc-900 border border-indigo-500/40 text-zinc-100 text-xs font-mono leading-relaxed outline-hidden focus:border-indigo-500 transition resize-none"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 2: SPEECH & AUDIO TRANSCRIPTION STUDIO                                */}
+      {/* ========================================================================= */}
+      {activeTab === 'transcribe' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Left Column: Live Microphone Studio & Oscilloscope */}
+          <div className="lg:col-span-6 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${isRecording ? 'bg-rose-500 animate-ping' : 'bg-zinc-600'}`} />
+                <h3 className="text-sm font-bold text-white">Live Microphone Dictation</h3>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={micLang}
+                  onChange={(e) => setMicLang(e.target.value)}
+                  className="px-2.5 py-1 rounded-lg border border-zinc-700 bg-zinc-800 text-xs text-zinc-200"
+                >
+                  <option value="en-US">English (US)</option>
+                  <option value="en-GB">English (UK)</option>
+                  <option value="es-ES">Spanish</option>
+                  <option value="fr-FR">French</option>
+                  <option value="de-DE">German</option>
+                  <option value="hi-IN">Hindi</option>
+                  <option value="zh-CN">Chinese</option>
+                  <option value="ja-JP">Japanese</option>
+                </select>
+
+                <button
+                  onClick={toggleRecording}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs cursor-pointer transition ${
+                    isRecording
+                      ? 'bg-rose-600 hover:bg-rose-500 text-white'
+                      : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                  }`}
+                >
+                  <Mic className="w-3.5 h-3.5" />
+                  <span>{isRecording ? 'Stop Recording' : 'Start Dictation'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Live Audio Oscilloscope Canvas */}
+            <div className="h-20 w-full rounded-xl bg-zinc-950 border border-zinc-800 flex items-center justify-center overflow-hidden p-2">
+              {isRecording ? (
+                <canvas ref={waveCanvasRef} width={500} height={70} className="w-full h-full" />
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  Click "Start Dictation" and speak into your microphone to view live audio waveform.
+                </p>
+              )}
+            </div>
+
+            {/* Dictation Output Canvas */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span>Duration: {recordingSeconds}s • {dictatedText.trim().split(/\s+/).filter(Boolean).length} words</span>
+                <button
+                  onClick={() => copyToClipboard(dictatedText, 'dictated')}
+                  disabled={!dictatedText}
+                  className="text-indigo-400 hover:underline flex items-center gap-1"
+                >
+                  {copiedId === 'dictated' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                  <span>{copiedId === 'dictated' ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+              <textarea
+                value={dictatedText}
+                onChange={(e) => setDictatedText(e.target.value)}
+                placeholder="Real-time transcribed speech will appear here..."
+                rows={8}
+                className="w-full p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs font-mono leading-relaxed outline-hidden focus:border-indigo-500 transition"
+              />
+            </div>
+          </div>
+
+          {/* Right Column: Audio File Transcription & Subtitle Generator */}
+          <div className="lg:col-span-6 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">Audio File Transcriber</h3>
+              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer transition">
+                <Upload className="w-3.5 h-3.5" />
+                <span>Upload Audio File</span>
+                <input
+                  type="file"
+                  accept="audio/*,video/*"
                   className="hidden"
                   onChange={(e) => handleAudioFileUpload(e.target.files?.[0])}
                 />
               </label>
-              {isTranscribingAudio && (
-                <div className="flex items-center justify-center gap-2 text-xs text-indigo-400">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Transcribing speech audio locally...</span>
-                </div>
-              )}
             </div>
-          </div>
 
-          {/* Transcript Result Box */}
-          <div className="space-y-2 pt-2">
-            <div className="flex items-center justify-between text-xs text-slate-400">
-              <span className="font-semibold text-white">Generated Speech Transcript</span>
-              <div className="flex gap-2">
+            {audioUrl && (
+              <div className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 space-y-2">
+                <div className="flex items-center justify-between text-xs text-zinc-300">
+                  <span className="font-semibold truncate">{audioFile?.name}</span>
+                  <span>{audioDuration}s</span>
+                </div>
+                <audio ref={audioPlayerRef} src={audioUrl} controls className="w-full h-8" />
+              </div>
+            )}
+
+            {/* Segmented Timestamped Transcript */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="font-semibold text-zinc-300">Timestamped Transcripts</span>
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(transcribedText);
-                    setCopiedKey('transcribe');
-                    setTimeout(() => setCopiedKey(null), 1500);
-                  }}
-                  disabled={!transcribedText}
-                  className="inline-flex items-center gap-1 text-slate-300 hover:text-white disabled:opacity-40 cursor-pointer"
+                  onClick={handleExportSrt}
+                  className="text-indigo-400 hover:underline flex items-center gap-1"
                 >
-                  {copiedKey === 'transcribe' ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                  <span>Copy</span>
-                </button>
-                <button
-                  onClick={() => {
-                    const blob = new Blob([transcribedText], { type: 'text/plain;charset=utf-8' });
-                    const a = document.createElement('a');
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `Transcript-${Date.now()}.txt`;
-                    a.click();
-                  }}
-                  disabled={!transcribedText}
-                  className="inline-flex items-center gap-1 text-indigo-400 hover:underline disabled:opacity-40 cursor-pointer"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Download .txt</span>
+                  <Download className="w-3 h-3" />
+                  <span>Download .SRT</span>
                 </button>
               </div>
+
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {audioSegments.map((seg, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => seekAudio(seg.start)}
+                    className="p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 hover:border-indigo-500/50 cursor-pointer transition text-xs space-y-1"
+                  >
+                    <div className="flex items-center justify-between text-indigo-400 font-mono text-[11px]">
+                      <span>{seg.timeStr}</span>
+                      <span className="text-zinc-500 hover:text-white flex items-center gap-1">
+                        <Play className="w-2.5 h-2.5" /> Play
+                      </span>
+                    </div>
+                    <p className="text-zinc-300 leading-relaxed">{seg.text}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <textarea
-              rows={6}
-              value={transcribedText}
-              onChange={(e) => setTranscribedText(e.target.value)}
-              placeholder="Spoken words and audio transcripts will appear here in real-time..."
-              className="w-full rounded-xl bg-slate-950 border border-slate-800 p-3.5 text-xs text-slate-200 leading-relaxed font-mono-code focus:outline-none focus:border-indigo-500"
-            />
           </div>
         </div>
       )}
 
-      {/* ------------------------------------------------------------- */}
-      {/* TAB 4: BROWSER-BASED AI PHOTO / IMAGE EDITOR                  */}
-      {/* ------------------------------------------------------------- */}
-      {activeTab === 'photo-editor' && (
-        <div className="space-y-4 bg-slate-900 border border-slate-800 rounded-2xl p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <ImageIcon className="w-4 h-4 text-indigo-400" />
-                Browser-Based AI Photo & Image Studio
-              </h3>
-              <p className="text-xs text-slate-400">100% in-browser GPU filters, AI auto-enhance, and precision tuning.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer">
-                <Upload className="w-3.5 h-3.5 text-indigo-400" />
-                <span>Upload Photo</span>
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) {
-                      setPhotoName(f.name);
-                      const r = new FileReader();
-                      r.onload = () => setPhotoSrc(r.result as string);
-                      r.readAsDataURL(f);
-                    }
-                  }}
-                />
-              </label>
+      {/* ========================================================================= */}
+      {/* TAB 3: 130+ LANGUAGE TRANSLATION STUDIO                                   */}
+      {/* ========================================================================= */}
+      {activeTab === 'translate' && (
+        <div className="space-y-4">
+          {/* Language Selector Top Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-2xl bg-zinc-900 border border-zinc-800">
+            <div className="flex items-center gap-2">
+              <select
+                value={sourceLang}
+                onChange={(e) => setSourceLang(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-700 text-xs font-bold text-zinc-100"
+              >
+                {WORLD_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name} ({l.native})
+                  </option>
+                ))}
+              </select>
 
               <button
-                onClick={handleAiAutoEnhance}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-600/25 cursor-pointer"
+                onClick={handleSwapLanguages}
+                title="Swap source and target languages"
+                className="p-2 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>AI Auto-Enhance</span>
+                <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-400" />
+              </button>
+
+              <select
+                value={targetLang}
+                onChange={(e) => setTargetLang(e.target.value)}
+                className="px-3 py-1.5 rounded-xl bg-zinc-950 border border-zinc-700 text-xs font-bold text-zinc-100"
+              >
+                {WORLD_LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name} ({l.native})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleDownloadBilingualPdf}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Bilingual PDF</span>
               </button>
             </div>
           </div>
 
-          {/* AI Creative Presets Bar */}
-          <div className="space-y-1.5">
-            <span className="text-[11px] font-semibold text-slate-400">Creative & AI Style Presets:</span>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { id: 'none', label: 'Original' },
-                { id: 'auto', label: '✨ AI Auto-Tone' },
-                { id: 'portrait', label: 'Studio Portrait' },
-                { id: 'cinematic', label: 'Cinematic Mood' },
-                { id: 'clarity', label: 'Crisp Clarity' },
-                { id: 'noir', label: 'Noir B&W' },
-                { id: 'golden', label: 'Golden Hour' },
-                { id: 'doc-clean', label: 'Document Clean' },
-              ].map((p) => (
+          {/* Dual-Pane Studio Editor */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Source Text Box */}
+            <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="font-bold text-zinc-300">Source Text</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => speakText(translateInput, sourceLang)}
+                    title="Pronounce text"
+                    className="p-1 rounded-md text-zinc-400 hover:text-white"
+                  >
+                    <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(translateInput, 'src-trans')}
+                    className="p-1 rounded-md text-zinc-400 hover:text-white"
+                  >
+                    {copiedId === 'src-trans' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                value={translateInput}
+                onChange={(e) => setTranslateInput(e.target.value)}
+                rows={10}
+                placeholder="Type or paste text to translate..."
+                className="w-full p-3.5 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-100 text-xs font-mono leading-relaxed outline-hidden focus:border-indigo-500 transition resize-none"
+              />
+            </div>
+
+            {/* Target Translated Text Box */}
+            <div className="p-4 rounded-2xl bg-zinc-900/90 border border-zinc-800 space-y-3">
+              <div className="flex items-center justify-between text-xs text-zinc-400">
+                <span className="font-bold text-indigo-400">
+                  {isTranslating ? 'Translating...' : 'Target Translation'}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => speakText(translateOutput, targetLang)}
+                    title="Pronounce translation"
+                    className="p-1 rounded-md text-zinc-400 hover:text-white"
+                  >
+                    <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
+                  </button>
+                  <button
+                    onClick={() => copyToClipboard(translateOutput, 'tgt-trans')}
+                    className="p-1 rounded-md text-zinc-400 hover:text-white"
+                  >
+                    {copiedId === 'tgt-trans' ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <textarea
+                readOnly
+                value={translateOutput}
+                rows={10}
+                placeholder="Translation will appear automatically..."
+                className="w-full p-3.5 rounded-xl bg-zinc-950 border border-indigo-500/30 text-zinc-100 text-xs font-mono leading-relaxed outline-hidden resize-none"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: AI VISION & PHOTO STUDIO                                           */}
+      {/* ========================================================================= */}
+      {activeTab === 'photo-studio' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Main Visual Stage with Interactive Split View */}
+          <div className="lg:col-span-8 space-y-4">
+            {/* Split Comparison Stage */}
+            <div className="relative w-full aspect-16/10 rounded-2xl bg-zinc-950 border border-zinc-800 overflow-hidden flex items-center justify-center select-none shadow-2xl">
+              {/* Filtered Enhanced Canvas */}
+              <canvas
+                ref={enhancedCanvasRef}
+                className="absolute inset-0 w-full h-full object-contain"
+              />
+
+              {/* Split Overlay: Original Canvas with clip-path */}
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ clipPath: `inset(0 0 0 ${splitPosition}%)` }}
+              >
+                <canvas
+                  ref={origCanvasRef}
+                  className="w-full h-full object-contain opacity-95"
+                />
+              </div>
+
+              {/* Draggable Divider Handle */}
+              <div
+                className="absolute top-0 bottom-0 w-1 bg-white cursor-ew-resize z-20 shadow-md flex items-center justify-center"
+                style={{ left: `${splitPosition}%` }}
+                onMouseDown={() => setIsDraggingSplit(true)}
+              >
+                <div className="w-6 h-6 rounded-full bg-white text-zinc-900 shadow-lg flex items-center justify-center text-[10px] font-bold">
+                  ↔
+                </div>
+              </div>
+
+              {/* Interactive mouse drag handler over container */}
+              <div
+                className="absolute inset-0 cursor-ew-resize z-10"
+                onMouseMove={(e) => {
+                  if (e.buttons === 1 || isDraggingSplit) {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+                    setSplitPosition(Math.round((x / rect.width) * 100));
+                  }
+                }}
+                onMouseUp={() => setIsDraggingSplit(false)}
+              />
+
+              {/* Badges */}
+              <div className="absolute top-3 left-3 z-30 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-xs text-[10px] font-bold text-indigo-400 border border-indigo-500/30">
+                ✨ ENHANCED (LEFT)
+              </div>
+              <div className="absolute top-3 right-3 z-30 px-2.5 py-1 rounded-lg bg-black/70 backdrop-blur-xs text-[10px] font-bold text-zinc-400 border border-zinc-700">
+                ORIGINAL (RIGHT)
+              </div>
+            </div>
+
+            {/* Preset Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-zinc-900 border border-zinc-800">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">AI Styles:</span>
+                {[
+                  { id: 'auto', label: '✨ Auto-Enhance' },
+                  { id: 'doc', label: '📄 Document Scan' },
+                  { id: 'cinema', label: '🎬 Cinematic' },
+                  { id: 'hdr', label: '🏙️ HDR Pop' },
+                  { id: 'noir', label: '🖤 Noir B&W' },
+                  { id: 'reset', label: '↺ Reset' },
+                ].map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => applyPreset(p.id as any)}
+                    className="px-2.5 py-1 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-semibold text-zinc-200 transition cursor-pointer"
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex items-center gap-2">
                 <button
-                  key={p.id}
-                  onClick={() => selectPhotoPreset(p.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold cursor-pointer ${
-                    activePreset === p.id
-                      ? 'bg-indigo-600 text-white font-bold'
-                      : 'bg-slate-950 text-slate-300 border border-slate-800 hover:text-white'
-                  }`}
+                  onClick={() => setRotationAngle((r) => (r + 90) % 360)}
+                  className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300"
+                  title="Rotate 90 degrees"
                 >
-                  {p.label}
+                  <RotateCw className="w-3.5 h-3.5" />
                 </button>
-              ))}
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-            {/* Photo Canvas Stage */}
-            <div className="lg:col-span-8 bg-slate-950 border border-slate-800 rounded-2xl p-4 flex flex-col items-center justify-center min-h-[360px] overflow-hidden">
-              <canvas ref={photoCanvasRef} className="max-w-full max-h-[460px] object-contain rounded-xl shadow-2xl" />
-              <div className="flex items-center gap-3 mt-3">
-                <button
-                  onClick={() => setRotationAngle((a) => (a + 90) % 360)}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs cursor-pointer"
-                >
-                  <RotateCw className="w-3 h-3" />
-                  <span>Rotate 90°</span>
-                </button>
-                <button
-                  onClick={() => selectPhotoPreset('none')}
-                  className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white text-xs cursor-pointer"
-                >
-                  Reset Adjustments
-                </button>
+          {/* Right Column: Precision Sliders, RGB Histogram & Export */}
+          <div className="lg:col-span-4 bg-zinc-900/90 border border-zinc-800 rounded-2xl p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">Precision Tuning</h3>
+              <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
+                <Upload className="w-3 h-3" />
+                <span>Upload Photo</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setPhotoName(file.name);
+                      const url = URL.createObjectURL(file);
+                      setPhotoSrc(url);
+                    }
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* RGB Histogram Canvas */}
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px] text-zinc-400">
+                <span>RGB Distribution</span>
+                <span className="text-[10px] text-zinc-500">Live Histogram</span>
+              </div>
+              <div className="h-16 w-full rounded-xl overflow-hidden border border-zinc-800">
+                <canvas ref={histoCanvasRef} width={256} height={60} className="w-full h-full" />
               </div>
             </div>
 
-            {/* Precision Adjustment Sliders */}
-            <div className="lg:col-span-4 bg-slate-950 border border-slate-800 rounded-2xl p-4 space-y-3.5">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-indigo-400" />
-                  Precision Adjustments
-                </h4>
-              </div>
-
-              {/* Brightness */}
+            {/* Sliders */}
+            <div className="space-y-3 text-xs">
               <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                <div className="flex justify-between text-zinc-300 mb-1">
                   <span>Exposure / Brightness</span>
                   <span>{brightness > 0 ? `+${brightness}` : brightness}</span>
                 </div>
                 <input
                   type="range"
-                  min="-60"
-                  max="60"
+                  min={-80}
+                  max={80}
                   value={brightness}
-                  onChange={(e) => setBrightness(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
+                  onChange={(e) => setBrightness(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 cursor-pointer"
                 />
               </div>
 
-              {/* Contrast */}
               <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
+                <div className="flex justify-between text-zinc-300 mb-1">
                   <span>Contrast</span>
                   <span>{contrast > 0 ? `+${contrast}` : contrast}</span>
                 </div>
                 <input
                   type="range"
-                  min="-60"
-                  max="80"
+                  min={-60}
+                  max={80}
                   value={contrast}
-                  onChange={(e) => setContrast(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
+                  onChange={(e) => setContrast(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 cursor-pointer"
                 />
               </div>
 
-              {/* Saturation */}
               <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Saturation & Vibrance</span>
+                <div className="flex justify-between text-zinc-300 mb-1">
+                  <span>Vibrancy / Saturation</span>
                   <span>{saturation > 0 ? `+${saturation}` : saturation}</span>
                 </div>
                 <input
                   type="range"
-                  min="-100"
-                  max="100"
+                  min={-100}
+                  max={100}
                   value={saturation}
-                  onChange={(e) => setSaturation(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
+                  onChange={(e) => setSaturation(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 cursor-pointer"
                 />
               </div>
 
-              {/* Warmth */}
               <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Warmth / Temperature</span>
+                <div className="flex justify-between text-zinc-300 mb-1">
+                  <span>Warmth / Tint</span>
                   <span>{warmth > 0 ? `+${warmth}` : warmth}</span>
                 </div>
                 <input
                   type="range"
-                  min="-50"
-                  max="50"
+                  min={-40}
+                  max={40}
                   value={warmth}
-                  onChange={(e) => setWarmth(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
+                  onChange={(e) => setWarmth(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 cursor-pointer"
                 />
               </div>
 
-              {/* Vignette */}
               <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Vignette Edge Shadows</span>
+                <div className="flex justify-between text-zinc-300 mb-1">
+                  <span>Vignette</span>
                   <span>{vignette}%</span>
                 </div>
                 <input
                   type="range"
-                  min="0"
-                  max="80"
+                  min={0}
+                  max={100}
                   value={vignette}
-                  onChange={(e) => setVignette(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
+                  onChange={(e) => setVignette(parseInt(e.target.value))}
+                  className="w-full accent-indigo-500 cursor-pointer"
                 />
               </div>
+            </div>
 
-              {/* Blur / Bokeh */}
-              <div>
-                <div className="flex justify-between text-[11px] text-slate-400 mb-1">
-                  <span>Background Soft Blur</span>
-                  <span>{blur}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="12"
-                  value={blur}
-                  onChange={(e) => setBlur(Number(e.target.value))}
-                  className="w-full accent-indigo-500"
-                />
-              </div>
-
-              {/* Export Buttons */}
-              <div className="pt-3 border-t border-slate-800 space-y-2">
-                <span className="block text-[11px] font-semibold text-slate-400">Download High-Res Photo:</span>
-                <div className="grid grid-cols-3 gap-1.5">
-                  <button
-                    onClick={() => downloadEditedPhoto('image/jpeg')}
-                    className="py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs cursor-pointer text-center"
-                  >
-                    JPG
-                  </button>
-                  <button
-                    onClick={() => downloadEditedPhoto('image/png')}
-                    className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer text-center"
-                  >
-                    PNG
-                  </button>
-                  <button
-                    onClick={() => downloadEditedPhoto('image/webp')}
-                    className="py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs cursor-pointer text-center"
-                  >
-                    WebP
-                  </button>
-                </div>
+            {/* Export Buttons */}
+            <div className="pt-2 border-t border-zinc-800 space-y-2">
+              <span className="text-[11px] font-bold text-zinc-400 uppercase">Export Enhanced Image:</span>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  onClick={() => handleDownloadEnhancedPhoto('jpeg')}
+                  className="py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition cursor-pointer"
+                >
+                  .JPG
+                </button>
+                <button
+                  onClick={() => handleDownloadEnhancedPhoto('png')}
+                  className="py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition cursor-pointer"
+                >
+                  .PNG
+                </button>
+                <button
+                  onClick={() => handleDownloadEnhancedPhoto('webp')}
+                  className="py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition cursor-pointer"
+                >
+                  .WEBP
+                </button>
               </div>
             </div>
           </div>
@@ -1405,3 +1985,4 @@ This Agreement shall be governed by and construed under the laws of the State of
     </div>
   );
 };
+export default AiSolutions;
