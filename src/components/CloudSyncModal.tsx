@@ -190,11 +190,11 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
       <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
         <div className="px-5 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Cloud className="w-4 h-4 text-indigo-500" />
+            <Cloud className="w-4 h-4 shrink-0 text-indigo-500" />
             <h3 className="text-sm font-semibold text-white">Optional Cloud Workspace Sync</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white cursor-pointer">
-            <X className="w-4 h-4" />
+          <button onClick={onClose} className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center text-slate-400 hover:text-white cursor-pointer touch-manipulation">
+            <X className="w-4 h-4 shrink-0" />
           </button>
         </div>
 
@@ -236,18 +236,18 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                 <button
                   onClick={handlePush}
                   disabled={busy}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer touch-manipulation"
                 >
-                  <UploadCloud className="w-3.5 h-3.5" />
-                  Push to Cloud
+                  <UploadCloud className="w-4 h-4 shrink-0" />
+                  <span>Push to Cloud</span>
                 </button>
                 <button
                   onClick={handlePull}
                   disabled={busy}
-                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 min-h-[42px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer touch-manipulation"
                 >
-                  <DownloadCloud className="w-3.5 h-3.5" />
-                  Pull from Cloud
+                  <DownloadCloud className="w-4 h-4 shrink-0" />
+                  <span>Pull from Cloud</span>
                 </button>
               </div>
 
@@ -256,10 +256,10 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                   await fbSignOut(auth);
                   setStatus({ text: 'Signed out. Local workspace data remains intact on your device.' });
                 }}
-                className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white text-xs font-medium cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 min-h-[40px] rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white text-xs font-medium cursor-pointer touch-manipulation"
               >
-                <LogOut className="w-3.5 h-3.5" />
-                Sign Out
+                <LogOut className="w-4 h-4 shrink-0" />
+                <span>Sign Out</span>
               </button>
             </div>
           ) : (
@@ -271,7 +271,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                     setAuthMode('signin');
                     setStatus(null);
                   }}
-                  className={`py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                  className={`py-2 rounded-lg text-xs font-semibold cursor-pointer touch-manipulation ${
                     authMode === 'signin' ? 'bg-indigo-600 text-white' : 'text-slate-400'
                   }`}
                 >
@@ -283,7 +283,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                     setAuthMode('signup');
                     setStatus(null);
                   }}
-                  className={`py-1.5 rounded-lg text-xs font-semibold cursor-pointer ${
+                  className={`py-2 rounded-lg text-xs font-semibold cursor-pointer touch-manipulation ${
                     authMode === 'signup' ? 'bg-indigo-600 text-white' : 'text-slate-400'
                   }`}
                 >
@@ -298,7 +298,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Email address (e.g. you@example.com)"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
                 />
                 <input
                   type="password"
@@ -307,23 +307,25 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Password (min 6 characters)"
-                  className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs text-white"
                 />
                 <button
                   type="submit"
                   disabled={busy}
-                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer touch-manipulation active:scale-[0.99]"
                 >
                   {authMode === 'signin' ? (
-                    <LogIn className="w-3.5 h-3.5" />
+                    <LogIn className="w-4 h-4 shrink-0" />
                   ) : (
-                    <UserPlus className="w-3.5 h-3.5" />
+                    <UserPlus className="w-4 h-4 shrink-0" />
                   )}
-                  {busy
-                    ? 'Connecting...'
-                    : authMode === 'signin'
-                    ? 'Sign In / Sync with Email'
-                    : 'Create Account & Sync'}
+                  <span>
+                    {busy
+                      ? 'Connecting...'
+                      : authMode === 'signin'
+                      ? 'Sign In / Sync with Email'
+                      : 'Create Account & Sync'}
+                  </span>
                 </button>
               </form>
 
@@ -332,7 +334,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                   type="button"
                   onClick={handleGoogleLogin}
                   disabled={busy}
-                  className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 cursor-pointer"
+                  className="px-3 py-2.5 min-h-[40px] rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-200 cursor-pointer touch-manipulation"
                 >
                   Google Sign-In
                 </button>
@@ -340,7 +342,7 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
                   type="button"
                   onClick={handleAnonymousCloudSync}
                   disabled={busy}
-                  className="px-3 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 cursor-pointer"
+                  className="px-3 py-2.5 min-h-[40px] rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-xs font-medium text-slate-300 cursor-pointer touch-manipulation"
                 >
                   One-Click Guest Sync
                 </button>

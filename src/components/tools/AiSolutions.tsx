@@ -1144,10 +1144,10 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
       {/* Flagship AI Navigation Tabs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {[
-          { id: 'doc-intel', label: 'Document Intelligence & Chat', icon: Sparkles, badge: 'PDF & Text' },
-          { id: 'transcribe', label: 'Audio & Speech Transcriber', icon: Mic, badge: 'Web Audio' },
-          { id: 'translate', label: 'AI Translation Studio', icon: Languages, badge: '130+ Langs' },
-          { id: 'photo-studio', label: 'AI Vision & Photo Studio', icon: ImageIcon, badge: 'GPU Canvas' },
+          { id: 'doc-intel', label: 'Document Intelligence & Chat', shortLabel: 'Doc Chat', icon: Sparkles, badge: 'PDF & Text' },
+          { id: 'transcribe', label: 'Audio & Speech Transcriber', shortLabel: 'Transcriber', icon: Mic, badge: 'Web Audio' },
+          { id: 'translate', label: 'AI Translation Studio', shortLabel: 'Translate', icon: Languages, badge: '130+ Langs' },
+          { id: 'photo-studio', label: 'AI Vision & Photo Studio', shortLabel: 'AI Vision', icon: ImageIcon, badge: 'GPU Canvas' },
         ].map((tab) => {
           const Icon = tab.icon;
           const active = activeTab === tab.id;
@@ -1155,7 +1155,7 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as StudioTab)}
-              className={`flex items-center justify-between p-3 rounded-2xl border transition text-left cursor-pointer ${
+              className={`flex items-center justify-between p-3 min-h-[56px] rounded-2xl border transition text-left cursor-pointer touch-manipulation active:scale-[0.98] ${
                 active
                   ? 'bg-indigo-600/15 border-indigo-500 text-indigo-400 dark:text-indigo-300 shadow-xs'
                   : 'bg-zinc-900/60 hover:bg-zinc-900 border-zinc-800/90 text-zinc-400 hover:text-zinc-200'
@@ -1167,11 +1167,12 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
                     active ? 'bg-indigo-600 text-white' : 'bg-zinc-800 text-zinc-400'
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4 shrink-0" />
                 </div>
                 <div className="min-w-0">
-                  <span className="block text-xs font-bold text-zinc-100 truncate">{tab.label}</span>
-                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider">{tab.badge}</span>
+                  <span className="block text-xs font-bold text-zinc-100 truncate sm:hidden">{tab.shortLabel}</span>
+                  <span className="hidden sm:block text-xs font-bold text-zinc-100 truncate">{tab.label}</span>
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-wider truncate block">{tab.badge}</span>
                 </div>
               </div>
             </button>
@@ -1185,28 +1186,28 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
       {activeTab === 'doc-intel' && (
         <div className="space-y-4">
           {/* Document Header & Overview Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 sm:p-4 rounded-2xl bg-zinc-900/80 border border-zinc-800">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center shrink-0">
-                <FileText className="w-5 h-5" />
+                <FileText className="w-5 h-5 shrink-0" />
               </div>
               <div className="min-w-0">
                 <h3 className="text-sm font-bold text-zinc-100 truncate">{docTitle}</h3>
-                <div className="flex items-center gap-3 text-xs text-zinc-400">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
                   <span>{docStats.wordCount.toLocaleString()} words</span>
-                  <span>•</span>
+                  <span className="hidden xs:inline">•</span>
                   <span>{docStats.readingTimeMin} min read</span>
-                  <span>•</span>
+                  <span className="hidden xs:inline">•</span>
                   <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <ShieldCheck className="w-3.5 h-3.5" /> 100% In-Memory
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" /> 100% In-Memory
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer transition">
-                <Upload className="w-3.5 h-3.5" />
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer transition touch-manipulation">
+                <Upload className="w-4 h-4 shrink-0" />
                 <span>Upload PDF / TXT</span>
                 <input
                   type="file"
@@ -1218,16 +1219,16 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
 
               <button
                 onClick={handleExportBriefPdf}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer transition"
+                className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-xl border border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-xs font-semibold cursor-pointer transition touch-manipulation"
               >
-                <Download className="w-3.5 h-3.5 text-indigo-400" />
+                <Download className="w-4 h-4 shrink-0 text-indigo-400" />
                 <span>Export Brief PDF</span>
               </button>
             </div>
           </div>
 
           {/* Sub-Tabs: Insights & Summary vs Q&A Chat vs Rewriter */}
-          <div className="flex items-center gap-1 border-b border-zinc-800 pb-2">
+          <div className="flex items-center gap-1.5 border-b border-zinc-800 pb-2 overflow-x-auto no-scrollbar">
             {[
               { id: 'insights', label: 'Summary & Clause Audit', icon: Zap },
               { id: 'chat', label: 'Ask Document (Q&A Chat)', icon: MessageSquare },
@@ -1239,13 +1240,13 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
                 <button
                   key={st.id}
                   onClick={() => setDocIntelSubTab(st.id as DocIntelSubTab)}
-                  className={`inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  className={`inline-flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-xl text-xs font-bold transition cursor-pointer shrink-0 whitespace-nowrap touch-manipulation ${
                     active
                       ? 'bg-zinc-800 text-white border border-zinc-700 shadow-2xs'
                       : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-900/50'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5 text-indigo-400" />
+                  <Icon className="w-4 h-4 shrink-0 text-indigo-400" />
                   <span>{st.label}</span>
                 </button>
               );

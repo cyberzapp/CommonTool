@@ -981,11 +981,11 @@ export const MediaConverter: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800">
+        <div className="flex items-center gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800 overflow-x-auto no-scrollbar">
           {[
-            { id: 'batch', label: 'Batch Convert & Compress', icon: Layers },
-            { id: 'crop', label: 'Crop & Resize', icon: Crop },
-            { id: 'audio', label: 'Audio Trimmer', icon: Music },
+            { id: 'batch', label: 'Batch Convert & Compress', shortLabel: 'Batch', icon: Layers },
+            { id: 'crop', label: 'Crop & Resize', shortLabel: 'Crop', icon: Crop },
+            { id: 'audio', label: 'Audio Trimmer', shortLabel: 'Audio', icon: Music },
           ].map((t) => {
             const Icon = t.icon;
             const active = workspace === t.id;
@@ -993,11 +993,12 @@ export const MediaConverter: React.FC = () => {
               <button
                 key={t.id}
                 onClick={() => setWorkspace(t.id as Workspace)}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                className={`inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer touch-manipulation active:scale-95 shrink-0 ${
                   active ? 'bg-zinc-800 text-white shadow-2xs' : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >
-                <Icon className="w-3.5 h-3.5 text-indigo-400" />
+                <Icon className="w-4 h-4 shrink-0 text-indigo-400" />
+                <span className="sm:hidden">{t.shortLabel}</span>
                 <span className="hidden sm:inline">{t.label}</span>
               </button>
             );
@@ -1071,8 +1072,9 @@ export const MediaConverter: React.FC = () => {
                       </>
                     )}
                   </div>
-                  <button onClick={clearAll} className="inline-flex items-center gap-1 text-zinc-400 hover:text-rose-400 cursor-pointer">
-                    <Trash2 className="w-3.5 h-3.5" /> Clear all
+                  <button onClick={clearAll} className="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-zinc-400 hover:text-rose-400 cursor-pointer touch-manipulation">
+                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Clear all</span>
                   </button>
                 </div>
 
@@ -1081,8 +1083,8 @@ export const MediaConverter: React.FC = () => {
                   {items.map((it) => {
                     const delta = it.out ? Math.round((1 - it.out.size / it.origSize) * 100) : null;
                     return (
-                      <div key={it.id} className={`${panel} p-2.5 flex items-center gap-3`}>
-                        <div className="w-14 h-14 rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden flex items-center justify-center shrink-0">
+                      <div key={it.id} className={`${panel} p-2.5 sm:p-3 flex items-center gap-3`}>
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg bg-zinc-950 border border-zinc-800 overflow-hidden flex items-center justify-center shrink-0">
                           {it.thumbUrl ? (
                             <img src={it.thumbUrl} alt="" className="w-full h-full object-cover" />
                           ) : (
@@ -1125,25 +1127,25 @@ export const MediaConverter: React.FC = () => {
 
                         <div className="flex items-center gap-1.5 shrink-0">
                           {it.status === 'queued' && <span className="text-[11px] text-zinc-500">Queued</span>}
-                          {it.status === 'processing' && <Loader2 className="w-4 h-4 text-indigo-400 animate-spin" />}
-                          {it.status === 'error' && <AlertTriangle className="w-4 h-4 text-rose-400" />}
+                          {it.status === 'processing' && <Loader2 className="w-4 h-4 shrink-0 text-indigo-400 animate-spin" />}
+                          {it.status === 'error' && <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />}
                           {it.status === 'done' && it.out && (
                             <a
                               href={it.out.url}
                               download={`${baseName(it.name)}.${it.out.ext}`}
-                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold"
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-100 text-xs font-semibold touch-manipulation"
                             >
-                              <Download className="w-3.5 h-3.5 text-indigo-400" />
-                              Save
+                              <Download className="w-3.5 h-3.5 shrink-0 text-indigo-400" />
+                              <span>Save</span>
                             </a>
                           )}
                           <button
                             onClick={() => removeItem(it.id)}
                             disabled={it.status === 'processing'}
-                            className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 disabled:opacity-30 cursor-pointer"
+                            className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-zinc-500 hover:text-rose-400 disabled:opacity-30 cursor-pointer touch-manipulation"
                             aria-label={`Remove ${it.name}`}
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-3.5 h-3.5 shrink-0" />
                           </button>
                         </div>
                       </div>
@@ -1323,24 +1325,26 @@ export const MediaConverter: React.FC = () => {
                 <button
                   onClick={runBatch}
                   disabled={isBatchRunning || batchStats.pending === 0}
-                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold cursor-pointer transition"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 min-h-[44px] rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs sm:text-sm font-bold cursor-pointer transition touch-manipulation active:scale-[0.99]"
                 >
-                  {isBatchRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
-                  {isBatchRunning
-                    ? 'Processing…'
-                    : batchStats.pending > 0
-                    ? `Convert ${batchStats.pending} image${batchStats.pending === 1 ? '' : 's'}`
-                    : items.length === 0
-                    ? 'Add images to start'
-                    : 'All images converted'}
+                  {isBatchRunning ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Zap className="w-4 h-4 shrink-0" />}
+                  <span>
+                    {isBatchRunning
+                      ? 'Processing…'
+                      : batchStats.pending > 0
+                      ? `Convert ${batchStats.pending} image${batchStats.pending === 1 ? '' : 's'}`
+                      : items.length === 0
+                      ? 'Add images to start'
+                      : 'All images converted'}
+                  </span>
                 </button>
                 <button
                   onClick={downloadAllZip}
                   disabled={batchStats.doneCount === 0 || isZipping}
-                  className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-100 text-xs font-bold cursor-pointer transition"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 min-h-[44px] rounded-xl bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-100 text-xs sm:text-sm font-bold cursor-pointer transition touch-manipulation active:scale-[0.99]"
                 >
-                  {isZipping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4 text-indigo-400" />}
-                  {batchStats.doneCount > 1 ? `Download all (${batchStats.doneCount}) as ZIP` : 'Download result'}
+                  {isZipping ? <Loader2 className="w-4 h-4 shrink-0 animate-spin" /> : <Archive className="w-4 h-4 shrink-0 text-indigo-400" />}
+                  <span>{batchStats.doneCount > 1 ? `Download all (${batchStats.doneCount}) as ZIP` : 'Download result'}</span>
                 </button>
               </div>
             </div>
@@ -1421,22 +1425,22 @@ export const MediaConverter: React.FC = () => {
                 </div>
 
                 <div className={`${panel} px-3 py-2 flex flex-wrap items-center justify-between gap-2`}>
-                  <div className="flex items-center gap-1.5">
-                    <button onClick={() => setRotation((r) => (r + 270) % 360)} className={seg(false)} title="Rotate left">
-                      <RotateCcw className="w-3.5 h-3.5" />
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <button onClick={() => setRotation((r) => (r + 270) % 360)} className={`${seg(false)} p-2 min-h-[36px] min-w-[36px] flex items-center justify-center touch-manipulation`} title="Rotate left">
+                      <RotateCcw className="w-4 h-4 shrink-0" />
                     </button>
-                    <button onClick={() => setRotation((r) => (r + 90) % 360)} className={seg(false)} title="Rotate right">
-                      <RotateCw className="w-3.5 h-3.5" />
+                    <button onClick={() => setRotation((r) => (r + 90) % 360)} className={`${seg(false)} p-2 min-h-[36px] min-w-[36px] flex items-center justify-center touch-manipulation`} title="Rotate right">
+                      <RotateCw className="w-4 h-4 shrink-0" />
                     </button>
-                    <button onClick={() => setFlipH((v) => !v)} className={seg(flipH)} title="Flip horizontally">
-                      <FlipHorizontal className="w-3.5 h-3.5" />
+                    <button onClick={() => setFlipH((v) => !v)} className={`${seg(flipH)} p-2 min-h-[36px] min-w-[36px] flex items-center justify-center touch-manipulation`} title="Flip horizontally">
+                      <FlipHorizontal className="w-4 h-4 shrink-0" />
                     </button>
-                    <button onClick={() => setFlipV((v) => !v)} className={seg(flipV)} title="Flip vertically">
-                      <FlipVertical className="w-3.5 h-3.5" />
+                    <button onClick={() => setFlipV((v) => !v)} className={`${seg(flipV)} p-2 min-h-[36px] min-w-[36px] flex items-center justify-center touch-manipulation`} title="Flip vertically">
+                      <FlipVertical className="w-4 h-4 shrink-0" />
                     </button>
                     <button
                       onClick={() => setCrop(centeredCropFor(workDims.w, workDims.h, aspectRatio))}
-                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-zinc-400 hover:text-white cursor-pointer"
+                      className="px-2.5 py-1.5 min-h-[36px] rounded-lg text-xs font-semibold text-zinc-400 hover:text-white cursor-pointer touch-manipulation"
                     >
                       Reset crop
                     </button>

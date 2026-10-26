@@ -721,7 +721,7 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
                         : 'bg-white border-slate-200 text-slate-900'
                     }`}
                   />
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <input
                       type="text"
                       value={billingCity}

@@ -133,20 +133,20 @@ export const OcrScanner: React.FC = () => {
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             <ScanText className="w-5 h-5 text-emerald-400 shrink-0" />
-            <h2 className="text-lg font-bold text-white">OCR / Image-to-Text Scanner</h2>
+            <h2 className="text-base sm:text-lg font-bold text-white">OCR / Image-to-Text Scanner</h2>
             <button
               onClick={() => setShowInfo((v) => !v)}
               aria-label="Toggle tool information"
-              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer touch-manipulation"
               title="About this tool"
             >
-              <Info className="w-4 h-4" />
+              <Info className="w-4 h-4 shrink-0" />
             </button>
           </div>
 
-          <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer">
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload Image / Screenshot</span>
+          <label className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs cursor-pointer touch-manipulation">
+            <Upload className="w-4 h-4 shrink-0" />
+            <span>Upload Image</span>
             <input
               type="file"
               accept="image/*"
@@ -237,32 +237,32 @@ export const OcrScanner: React.FC = () => {
         </div>
 
         {/* Right: Live Editable Extracted Text Output Preview before Download */}
-        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-slate-900/50 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2.5">
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-white">Live Extracted Text Preview (Editable)</h3>
+              <h3 className="text-sm font-semibold text-white">Extracted Text (Editable)</h3>
               {confidence !== null && (
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                  {confidence}% Confidence
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[11px] font-semibold">
+                  {confidence}%
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
               <button
                 onClick={copyExtracted}
                 disabled={!ocrText}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs text-slate-200 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs text-slate-200 cursor-pointer touch-manipulation"
               >
-                {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Copied!' : 'Copy'}
+                {copied ? <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" /> : <Copy className="w-4 h-4 shrink-0" />}
+                <span>{copied ? 'Copied!' : 'Copy'}</span>
               </button>
               <button
                 onClick={downloadTxt}
                 disabled={!ocrText}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-xs font-bold text-slate-950 cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] rounded-lg bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-xs font-bold text-slate-950 cursor-pointer touch-manipulation active:scale-95"
               >
-                <Download className="w-3.5 h-3.5" />
-                Download .TXT
+                <Download className="w-4 h-4 shrink-0" />
+                <span>Download .TXT</span>
               </button>
             </div>
           </div>

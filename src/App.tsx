@@ -363,7 +363,7 @@ export function App() {
 
   return (
     <div
-      className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden flex flex-col pb-16 lg:pb-0 transition-colors duration-150 ${
+      className={`min-h-screen w-full max-w-[100vw] overflow-x-hidden flex flex-col pb-[calc(4.5rem+env(safe-area-inset-bottom))] lg:pb-0 transition-colors duration-150 ${
         isDark ? 'bg-[#09090b] text-zinc-100' : 'bg-[#f8fafc] text-slate-900'
       }`}
     >
@@ -371,7 +371,7 @@ export function App() {
       {/* UNIFIED STUDIO NAVBAR (Sleek, Single-Header Experience for Both Modes)   */}
       {/* ========================================================================= */}
       <header
-        className={`sticky top-0 z-30 w-full backdrop-blur-md border-b px-3 sm:px-6 transition-colors ${
+        className={`sticky top-0 z-30 w-full backdrop-blur-md border-b px-2.5 sm:px-6 transition-colors ${
           isDark
             ? 'bg-[#09090b]/92 border-zinc-800/80 shadow-xs shadow-black/40'
             : 'bg-white/92 border-slate-200/90 shadow-xs shadow-slate-900/5'
@@ -380,25 +380,25 @@ export function App() {
         <div
           className={`${
             activeToolId && isWideWorkspace ? 'w-full' : 'max-w-7xl'
-          } mx-auto flex items-center justify-between gap-2.5 h-13 min-w-0 transition-all`}
+          } mx-auto flex items-center justify-between gap-1.5 sm:gap-2.5 h-13 min-w-0 transition-all`}
         >
           {/* Left Group: Logo or Studio Breadcrumb */}
-          <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink">
             {activeToolId && activeToolMeta ? (
               /* Studio Mode: Breadcrumb with Quick Switcher */
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <a
                   href="/"
                   onClick={(e) => navigateToCategory('all', e)}
                   title="Return to All Tools"
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 ${
+                  className={`inline-flex items-center justify-center gap-1.5 p-2 sm:px-2.5 sm:py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer shrink-0 min-h-[36px] touch-manipulation ${
                     isDark
                       ? 'bg-zinc-900/90 hover:bg-zinc-800 border-zinc-800 text-zinc-300 hover:text-white'
                       : 'bg-slate-100/80 hover:bg-slate-200/80 border-slate-200 text-slate-700 hover:text-slate-950'
                   }`}
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">All Tools</span>
+                  <ArrowLeft className="w-4 h-4 shrink-0" />
+                  <span className="hidden md:inline">All Tools</span>
                 </a>
 
                 <div className="h-4 w-px bg-zinc-300 dark:bg-zinc-800 shrink-0 hidden sm:block" />
@@ -409,7 +409,7 @@ export function App() {
                     aria-label="Switch active tool"
                     value={activeToolId}
                     onChange={(e) => navigateToTool(e.target.value as ToolId)}
-                    className={`text-xs font-bold pl-2.5 pr-7 py-1.5 rounded-lg border appearance-none cursor-pointer truncate max-w-[170px] sm:max-w-[220px] md:max-w-none transition ${
+                    className={`text-xs font-bold pl-2 sm:pl-2.5 pr-6 sm:pr-7 py-1.5 rounded-lg border appearance-none cursor-pointer truncate max-w-[125px] xs:max-w-[160px] sm:max-w-[220px] md:max-w-none transition min-h-[36px] ${
                       isDark
                         ? 'bg-zinc-900/90 border-zinc-800 text-zinc-100 hover:border-zinc-700'
                         : 'bg-white border-slate-200 text-slate-900 hover:border-slate-300 shadow-2xs'
@@ -417,26 +417,26 @@ export function App() {
                   >
                     {TOOLS_CATALOG.map((t) => (
                       <option key={t.id} value={t.id}>
-                        {t.shortTitle} ({t.categoryLabel})
+                        {t.shortTitle}
                       </option>
                     ))}
                   </select>
-                  <ChevronDown className="w-3.5 h-3.5 absolute right-2 text-zinc-400 pointer-events-none" />
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0 absolute right-1.5 sm:right-2 text-zinc-400 pointer-events-none" />
                 </div>
               </div>
             ) : (
               /* Catalog Mode: Brand Logo & Navigation Links */
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                 <button
                   onClick={() => setMobileMenuOpen(true)}
                   aria-label="Open all tools menu"
-                  className={`lg:hidden p-2 rounded-lg border transition cursor-pointer shrink-0 ${
+                  className={`lg:hidden p-2 rounded-lg border transition cursor-pointer shrink-0 min-h-[36px] min-w-[36px] flex items-center justify-center touch-manipulation ${
                     isDark
                       ? 'bg-zinc-900 border-zinc-800 text-zinc-200'
                       : 'bg-slate-50 border-slate-200 text-slate-700'
                   }`}
                 >
-                  <Menu className="w-4 h-4" />
+                  <Menu className="w-4 h-4 shrink-0" />
                 </button>
 
                 <a
@@ -445,7 +445,7 @@ export function App() {
                   className="flex items-center gap-2 cursor-pointer group min-w-0 shrink-0"
                 >
                   <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0 transition-transform group-hover:scale-105">
-                    <Wrench className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                    <Wrench className="w-4 h-4 shrink-0" />
                   </div>
                   <span className="text-sm sm:text-base font-bold tracking-tight truncate">
                     CommonTool
@@ -476,18 +476,19 @@ export function App() {
           </div>
 
           {/* Center Group: Command Palette Search Bar (Cmd+K) */}
-          <div className="flex-1 max-w-xs sm:max-w-md mx-2 min-w-0">
+          <div className="flex-1 max-w-[38px] sm:max-w-xs md:max-w-md mx-1 sm:mx-2 min-w-0">
             <button
               onClick={() => setCommandPaletteOpen(true)}
-              className={`w-full flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl border text-xs transition cursor-pointer ${
+              aria-label="Search tools and guides"
+              className={`w-full flex items-center justify-center sm:justify-between gap-2 p-2 sm:px-3 sm:py-1.5 min-h-[36px] rounded-xl border text-xs transition cursor-pointer touch-manipulation ${
                 isDark
                   ? 'bg-zinc-900/80 hover:bg-zinc-800 border-zinc-800 text-zinc-400 hover:text-zinc-200'
                   : 'bg-slate-100/70 hover:bg-slate-200/70 border-slate-200 text-slate-500 hover:text-slate-800'
               }`}
             >
               <div className="flex items-center gap-2 truncate">
-                <Search className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">
+                <Search className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline truncate">
                   {activeToolId ? 'Jump to tool...' : 'Search 18 tools, guides...'}
                 </span>
               </div>
@@ -498,13 +499,13 @@ export function App() {
                     : 'bg-white border-slate-200 text-slate-500'
                 }`}
               >
-                <CommandIcon className="w-2.5 h-2.5" /> K
+                <CommandIcon className="w-2.5 h-2.5 shrink-0" /> K
               </kbd>
             </button>
           </div>
 
           {/* Right Group: Studio Controls & Platform Utilities */}
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {activeToolId ? (
               /* Studio Mode Actions */
               <>
@@ -516,30 +517,30 @@ export function App() {
                   }`}
                   title="All files and data are processed locally inside your web browser. Nothing is uploaded."
                 >
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
                   <span>100% On-Device</span>
                 </span>
 
                 <button
                   onClick={() => setIsWideWorkspace(!isWideWorkspace)}
                   title={isWideWorkspace ? 'Standard width (Centered)' : 'Expand workspace (Full width)'}
-                  className={`hidden sm:inline-flex items-center justify-center p-2 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                  className={`hidden sm:inline-flex items-center justify-center p-2 min-h-[36px] min-w-[36px] rounded-lg border text-xs font-semibold transition cursor-pointer touch-manipulation ${
                     isDark
                       ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300'
                       : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                   }`}
                 >
                   {isWideWorkspace ? (
-                    <Minimize2 className="w-3.5 h-3.5 text-indigo-500" />
+                    <Minimize2 className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
                   ) : (
-                    <Maximize2 className="w-3.5 h-3.5 text-indigo-500" />
+                    <Maximize2 className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
                   )}
                 </button>
 
                 <button
                   onClick={copyShareUrl}
                   title="Share this tool"
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                  className={`inline-flex items-center justify-center gap-1.5 p-2 sm:px-2.5 sm:py-1.5 min-h-[36px] rounded-lg border text-xs font-semibold transition cursor-pointer touch-manipulation ${
                     isDark
                       ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-300'
                       : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
@@ -547,12 +548,12 @@ export function App() {
                 >
                   {copiedUrl ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      <Check className="w-4 h-4 shrink-0 text-emerald-500" />
                       <span className="hidden lg:inline text-emerald-500">Copied</span>
                     </>
                   ) : (
                     <>
-                      <Share2 className="w-3.5 h-3.5 text-indigo-500" />
+                      <Share2 className="w-4 h-4 shrink-0 text-indigo-500" />
                       <span className="hidden lg:inline">Share</span>
                     </>
                   )}
@@ -562,13 +563,13 @@ export function App() {
                   href="/how-to-use"
                   onClick={(e) => navigateToStaticPage('how-to-use', e, activeToolMeta?.id)}
                   title="Step-by-step documentation for this tool"
-                  className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                  className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg border text-xs font-semibold transition cursor-pointer ${
                     isDark
                       ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-indigo-400'
                       : 'bg-white hover:bg-slate-50 border-slate-200 text-indigo-600'
                   }`}
                 >
-                  <BookOpen className="w-3.5 h-3.5" />
+                  <BookOpen className="w-3.5 h-3.5 shrink-0" />
                   <span className="hidden md:inline">Guides</span>
                 </a>
               </>
@@ -579,22 +580,22 @@ export function App() {
                   href="/donate"
                   onClick={(e) => navigateToStaticPage('donate', e)}
                   title="Support CommonTool development"
-                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition cursor-pointer shadow-xs"
                 >
-                  <Heart className="w-3.5 h-3.5 fill-white" />
+                  <Heart className="w-3.5 h-3.5 shrink-0 fill-white" />
                   <span>Donate</span>
                 </a>
 
                 <button
                   onClick={handleInstallPwaClick}
                   title="Install CommonTool App"
-                  className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                  className={`hidden md:inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-lg border text-xs font-semibold transition cursor-pointer ${
                     isDark
                       ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
                       : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                   }`}
                 >
-                  <Download className="w-3.5 h-3.5 text-indigo-500" />
+                  <Download className="w-3.5 h-3.5 shrink-0 text-indigo-500" />
                   <span>Install</span>
                 </button>
               </>
@@ -604,26 +605,26 @@ export function App() {
             <button
               onClick={toggleTheme}
               aria-label="Toggle theme"
-              className={`p-2 rounded-lg border transition cursor-pointer ${
+              className={`p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border transition cursor-pointer touch-manipulation ${
                 isDark
                   ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-amber-400'
                   : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
               }`}
             >
-              {isDark ? <Sun className="w-3.5 h-3.5" /> : <Moon className="w-3.5 h-3.5 text-slate-600" />}
+              {isDark ? <Sun className="w-4 h-4 shrink-0" /> : <Moon className="w-4 h-4 shrink-0 text-slate-600" />}
             </button>
 
             {/* Cloud Sync Status */}
             <button
               onClick={() => setCloudModalOpen(true)}
               aria-label="Cloud Sync"
-              className={`p-2 rounded-lg border transition cursor-pointer ${
+              className={`p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border transition cursor-pointer touch-manipulation ${
                 isDark
                   ? 'bg-zinc-900 hover:bg-zinc-800 border-zinc-800 text-zinc-200'
                   : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
               }`}
             >
-              <Cloud className={`w-3.5 h-3.5 ${user ? 'text-emerald-500' : 'text-indigo-500'}`} />
+              <Cloud className={`w-4 h-4 shrink-0 ${user ? 'text-emerald-500' : 'text-indigo-500'}`} />
             </button>
           </div>
         </div>
@@ -1000,16 +1001,16 @@ export function App() {
                 key={cat.id}
                 href={cat.path}
                 onClick={(e) => navigateToCategory(cat.id, e)}
-                className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition ${
+                className={`flex flex-col items-center justify-center gap-1 text-[10px] font-medium transition touch-manipulation active:scale-95 select-none ${
                   isActive
                     ? 'text-indigo-600 dark:text-indigo-400 font-bold'
                     : isDark
-                    ? 'text-zinc-500'
-                    : 'text-slate-400'
+                    ? 'text-zinc-500 hover:text-zinc-300'
+                    : 'text-slate-400 hover:text-slate-700'
                 }`}
               >
-                <Icon className="w-4 h-4" />
-                <span>{cat.shortLabel}</span>
+                <Icon className="w-5 h-5 shrink-0" />
+                <span className="truncate max-w-[56px] text-center">{cat.shortLabel}</span>
               </a>
             );
           })}
@@ -1032,9 +1033,9 @@ export function App() {
               <span className="text-sm font-bold">All 18 Tools & Guides</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 min-h-[36px] min-w-[36px] flex items-center justify-center"
               >
-                <X className="w-4 h-4" />
+                <X className="w-4 h-4 shrink-0" />
               </button>
             </div>
 
@@ -1042,9 +1043,9 @@ export function App() {
               <a
                 href="/how-to-use"
                 onClick={(e) => navigateToStaticPage('how-to-use', e)}
-                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600 text-white text-xs font-semibold"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl bg-indigo-600 text-white text-xs font-semibold"
               >
-                <BookOpen className="w-3.5 h-3.5" />
+                <BookOpen className="w-4 h-4 shrink-0" />
                 How to Use
               </a>
               <button
@@ -1052,11 +1053,11 @@ export function App() {
                   setMobileMenuOpen(false);
                   handleInstallPwaClick();
                 }}
-                className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold cursor-pointer ${
+                className={`flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-xl border text-xs font-semibold cursor-pointer ${
                   isDark ? 'bg-zinc-900 border-zinc-800 text-zinc-200' : 'bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
-                <Download className="w-3.5 h-3.5 text-indigo-500" />
+                <Download className="w-4 h-4 shrink-0 text-indigo-500" />
                 Install App
               </button>
             </div>
@@ -1069,7 +1070,7 @@ export function App() {
                     key={tool.id}
                     href={tool.path}
                     onClick={(e) => navigateToTool(tool.id, e)}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-semibold transition flex items-center justify-between ${
+                    className={`w-full text-left px-3 py-2.5 min-h-[40px] rounded-xl text-xs font-semibold transition flex items-center justify-between ${
                       isCurrent
                         ? 'bg-indigo-600 text-white'
                         : isDark

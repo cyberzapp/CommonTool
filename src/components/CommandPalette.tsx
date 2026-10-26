@@ -206,9 +206,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           <button
             onClick={onClose}
             aria-label="Close command palette"
-            className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200"
+            className="p-1.5 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 shrink-0 touch-manipulation"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4 shrink-0" />
           </button>
         </div>
 
@@ -235,7 +235,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                   data-index={idx}
                   onClick={item.action}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl cursor-pointer transition text-left ${
+                  className={`flex items-center justify-between gap-3 px-3.5 py-2.5 rounded-xl cursor-pointer transition text-left touch-manipulation ${
                     isSelected
                       ? isDark
                         ? 'bg-indigo-600/20 border border-indigo-500/40 text-white'
@@ -256,11 +256,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       }`}
                     >
                       {item.type === 'tool' ? (
-                        <Wrench className="w-3.5 h-3.5" />
+                        <Wrench className="w-4 h-4 shrink-0" />
                       ) : item.type === 'category' ? (
-                        <LayoutGrid className="w-3.5 h-3.5" />
+                        <LayoutGrid className="w-4 h-4 shrink-0" />
                       ) : (
-                        <BookOpen className="w-3.5 h-3.5" />
+                        <BookOpen className="w-4 h-4 shrink-0" />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -301,7 +301,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
                       {item.badge}
                     </span>
                     <ArrowRight
-                      className={`w-3.5 h-3.5 transition-transform ${
+                      className={`w-3.5 h-3.5 shrink-0 transition-transform ${
                         isSelected ? 'translate-x-0.5 text-indigo-500' : 'opacity-0'
                       }`}
                     />
@@ -330,7 +330,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             </span>
           </div>
           <span className="flex items-center gap-1 font-semibold text-emerald-500">
-            <ShieldCheck className="w-3 h-3" />
+            <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
             100% Zero-Upload
           </span>
         </div>

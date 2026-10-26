@@ -278,14 +278,14 @@ export const PdfOrganizer: React.FC = () => {
             type="button"
             onClick={() => setShowInfo(!showInfo)}
             title="About this tool"
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer touch-manipulation"
           >
-            <Info className="w-4 h-4" />
+            <Info className="w-4 h-4 shrink-0" />
           </button>
         </div>
 
-        <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
-          <Upload className="w-3.5 h-3.5" />
+        <label className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer touch-manipulation">
+          <Upload className="w-4 h-4 shrink-0" />
           <span>{pdfName ? 'Change PDF' : 'Upload PDF'}</span>
           <input
             type="file"
@@ -297,13 +297,13 @@ export const PdfOrganizer: React.FC = () => {
       </div>
 
       {showInfo && (
-        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+        <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 leading-relaxed">
           Stamp diagonal watermarks, add legal Bates numbers or Page X of Y footers, rotate pages, or edit PDF metadata. All changes are shown in the Live Page Preview before you download.
         </div>
       )}
 
       {/* Mode Tabs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:grid sm:grid-cols-4">
         {[
           { id: 'watermark' as OrganizerTab, label: 'Watermark', icon: Stamp },
           { id: 'pagenumbers' as OrganizerTab, label: 'Page / Bates #', icon: Hash },
@@ -317,13 +317,13 @@ export const PdfOrganizer: React.FC = () => {
               key={t.id}
               type="button"
               onClick={() => setActiveTab(t.id)}
-              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 min-h-[42px] rounded-xl text-xs font-semibold border transition cursor-pointer shrink-0 whitespace-nowrap touch-manipulation active:scale-95 ${
                 active
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-xs'
                   : 'bg-slate-900 border-slate-800 text-slate-300 hover:bg-slate-800'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-4 h-4 shrink-0" />
               <span>{t.label}</span>
             </button>
           );

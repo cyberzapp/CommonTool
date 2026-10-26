@@ -2432,44 +2432,44 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
               isFullScreen ? 'border-b w-full' : 'border rounded-2xl sticky top-14'
             }`}
           >
-            <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
               {/* Left: Exit Studio / Full-Screen Toggle + Document Name & Pages */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {isFullScreen ? (
                   <button
                     type="button"
                     onClick={() => setIsFullScreen(false)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold cursor-pointer border border-slate-700 shadow-sm transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold cursor-pointer border border-slate-700 shadow-sm transition touch-manipulation active:scale-95"
                     title="Exit Full-Screen Studio & Return to CommonTool"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5 text-indigo-400" />
+                    <ArrowLeft className="w-4 h-4 shrink-0 text-indigo-400" />
                     <span>Exit Studio</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => setIsFullScreen(true)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold cursor-pointer border border-indigo-500/30 shadow-sm transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 text-xs font-semibold cursor-pointer border border-indigo-500/30 shadow-sm transition touch-manipulation active:scale-95"
                     title="Maximize into Full-Screen Focused Studio"
                   >
-                    <Maximize2 className="w-3.5 h-3.5" />
+                    <Maximize2 className="w-4 h-4 shrink-0" />
                     <span>Full Screen</span>
                   </button>
                 )}
 
-                <div className="h-5 w-px bg-slate-800" />
+                <div className="h-5 w-px bg-slate-800 hidden xs:block" />
 
                 <button
                   type="button"
                   onClick={() => setIsSidebarOpen((v) => !v)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl text-xs font-semibold border transition cursor-pointer touch-manipulation ${
                     isSidebarOpen
                       ? 'bg-indigo-600/20 border-indigo-500/40 text-indigo-300'
                       : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-white'
                   }`}
                   title="Toggle Visual Page Thumbnails"
                 >
-                  <PanelLeft className="w-3.5 h-3.5" />
+                  <PanelLeft className="w-4 h-4 shrink-0" />
                   <span className="hidden sm:inline">Pages</span>
                   <span className="px-1.5 py-0.2 rounded-full bg-slate-800 text-[10px] text-slate-300 font-bold">
                     {pageCount}
@@ -2478,7 +2478,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
 
                 <div className="h-5 w-px bg-slate-800 hidden sm:block" />
 
-                <div className="flex items-center gap-1.5 max-w-[170px] sm:max-w-xs truncate">
+                <div className="flex items-center gap-1.5 max-w-[140px] xs:max-w-[170px] sm:max-w-xs truncate">
                   <FileText className="w-4 h-4 text-indigo-400 shrink-0" />
                   <span className="text-xs font-bold text-white truncate" title={fileName}>
                     {fileName || 'Document.pdf'}
@@ -2486,15 +2486,15 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                 </div>
 
                 {isOriginalEncrypted && (
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px]">
-                    <Lock className="w-2.5 h-2.5" />
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 font-semibold text-[10px] shrink-0">
+                    <Lock className="w-3 h-3 shrink-0" />
                     <span className="hidden md:inline">SECURED</span>
                   </span>
                 )}
               </div>
 
               {/* Center: Other PDF Tools Dropdown + Page Navigator & Zoom Controls */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {onSwitchPdfTab && (
                   <div className="relative">
                     <button
@@ -2503,12 +2503,12 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                         e.stopPropagation();
                         setPdfToolsMenuOpen((v) => !v);
                       }}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 min-h-[36px] rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer touch-manipulation"
                       title="More PDF Tools (Merge, Split, Compress, Rotate, Convert, E-Sign)"
                     >
-                      <Layers className="w-3.5 h-3.5 text-indigo-400" />
+                      <Layers className="w-4 h-4 shrink-0 text-indigo-400" />
                       <span className="hidden xl:inline">More PDF Tools</span>
-                      <ChevronDown className="w-3 h-3 text-slate-400" />
+                      <ChevronDown className="w-3.5 h-3.5 shrink-0 text-slate-400" />
                     </button>
 
                     {pdfToolsMenuOpen && (
@@ -2531,7 +2531,7 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                               setIsFullScreen(false);
                               onSwitchPdfTab(item.id as any);
                             }}
-                            className="w-full text-left px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition flex items-center justify-between group"
+                            className="w-full text-left px-2.5 py-2 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition flex items-center justify-between group touch-manipulation"
                           >
                             <div>
                               <p className="font-semibold text-white group-hover:text-indigo-300">{item.label}</p>
@@ -2546,25 +2546,25 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                 )}
 
                 {/* Page Stepper */}
-                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
+                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1 min-h-[36px]">
                   <button
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage <= 1}
-                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer touch-manipulation min-h-[28px] min-w-[28px] flex items-center justify-center"
                     aria-label="Previous page"
                   >
-                    <ChevronLeft className="w-3.5 h-3.5" />
+                    <ChevronLeft className="w-4 h-4 shrink-0" />
                   </button>
-                  <span className="text-xs font-semibold text-slate-200 px-1 min-w-[70px] text-center">
+                  <span className="text-xs font-semibold text-slate-200 px-1 min-w-[65px] text-center">
                     {currentPage} / {pageCount}
                   </span>
                   <button
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage >= pageCount}
-                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer"
+                    className="p-1 text-slate-400 hover:text-white disabled:opacity-30 cursor-pointer touch-manipulation min-h-[28px] min-w-[28px] flex items-center justify-center"
                     aria-label="Next page"
                   >
-                    <ChevronRight className="w-3.5 h-3.5" />
+                    <ChevronRight className="w-4 h-4 shrink-0" />
                   </button>
                 </div>
 
@@ -2573,53 +2573,53 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                   <button
                     type="button"
                     onClick={() => handleRotatePage(currentPage)}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-indigo-500/50 text-xs font-semibold cursor-pointer transition"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-indigo-500/50 text-xs font-semibold cursor-pointer transition touch-manipulation"
                     title="Rotate current page 90° clockwise"
                   >
-                    <RotateCw className="w-3.5 h-3.5 text-indigo-400" />
+                    <RotateCw className="w-4 h-4 shrink-0 text-indigo-400" />
                     <span className="hidden xl:inline">Rotate</span>
                   </button>
                   {pageCount > 1 && (
                     <button
                       type="button"
                       onClick={() => handleDeletePage(currentPage)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 text-xs font-semibold cursor-pointer transition"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 min-h-[36px] rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-rose-400 hover:border-rose-500/50 text-xs font-semibold cursor-pointer transition touch-manipulation"
                       title="Delete current page"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                      <Trash2 className="w-4 h-4 shrink-0 text-rose-400" />
                       <span className="hidden xl:inline">Delete</span>
                     </button>
                   )}
                 </div>
 
                 {/* Undo / Redo */}
-                <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5">
+                <div className="flex items-center gap-0.5 bg-slate-950 border border-slate-800 rounded-xl p-0.5 min-h-[36px]">
                   <button
                     onClick={handleUndo}
                     disabled={historyIndex <= 0}
-                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
+                    className="p-2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition touch-manipulation"
                     title="Undo (Ctrl+Z)"
                   >
-                    <Undo2 className="w-3.5 h-3.5" />
+                    <Undo2 className="w-4 h-4 shrink-0" />
                   </button>
                   <button
                     onClick={handleRedo}
                     disabled={historyIndex >= history.length - 1}
-                    className="p-1.5 text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition"
+                    className="p-2 min-h-[32px] min-w-[32px] flex items-center justify-center text-slate-300 hover:text-white disabled:opacity-25 hover:bg-slate-800 rounded-lg cursor-pointer transition touch-manipulation"
                     title="Redo (Ctrl+Y)"
                   >
-                    <Redo2 className="w-3.5 h-3.5" />
+                    <Redo2 className="w-4 h-4 shrink-0" />
                   </button>
                 </div>
 
                 {/* Zoom Stepper */}
-                <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1">
+                <div className="hidden md:flex items-center gap-1 bg-slate-950 border border-slate-800 rounded-xl px-2 py-1 min-h-[36px]">
                   <button
                     onClick={() => setZoom((z) => Math.max(0.5, Number((z - 0.15).toFixed(2))))}
                     className="p-1 text-slate-400 hover:text-white cursor-pointer"
                     title="Zoom Out"
                   >
-                    <ZoomOut className="w-3.5 h-3.5" />
+                    <ZoomOut className="w-4 h-4 shrink-0" />
                   </button>
                   <span className="text-xs font-mono font-bold text-slate-300 w-11 text-center">
                     {Math.round(zoom * 100)}%
@@ -2629,15 +2629,15 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                     className="p-1 text-slate-400 hover:text-white cursor-pointer"
                     title="Zoom In"
                   >
-                    <ZoomIn className="w-3.5 h-3.5" />
+                    <ZoomIn className="w-4 h-4 shrink-0" />
                   </button>
                 </div>
               </div>
 
               {/* Right: Change PDF & Primary Download */}
               <div className="flex items-center gap-2">
-                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer">
-                  <Upload className="w-3.5 h-3.5 text-indigo-400" />
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold cursor-pointer touch-manipulation">
+                  <Upload className="w-4 h-4 shrink-0 text-indigo-400" />
                   <span className="hidden sm:inline">Change PDF</span>
                   <input
                     type="file"
@@ -2657,9 +2657,9 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
                       }
                     }}
                     disabled={isExporting}
-                    className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-lg shadow-indigo-600/30"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[38px] rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs font-bold cursor-pointer shadow-lg shadow-indigo-600/30 touch-manipulation active:scale-95"
                   >
-                    <Download className="w-3.5 h-3.5" />
+                    <Download className="w-4 h-4 shrink-0" />
                     <span>{isExporting ? 'Exporting...' : `Download PDF${modifiedCount > 0 ? ` (${modifiedCount})` : ''}`}</span>
                   </button>
 

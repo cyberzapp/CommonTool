@@ -800,7 +800,7 @@ export const PdfMultiTool: React.FC = () => {
   return (
     <div className="space-y-4">
       {/* Compact Header with (i) Info Button */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 bg-slate-900 border border-slate-800 rounded-xl px-3 sm:px-4 py-3">
         <div className="flex items-center gap-2">
           <FileText className="w-5 h-5 text-indigo-500 shrink-0" />
           <h2 className="text-base font-bold text-white">PDF Multi-Tool</h2>
@@ -808,15 +808,15 @@ export const PdfMultiTool: React.FC = () => {
             type="button"
             onClick={() => setShowInfo(!showInfo)}
             title="About PDF Multi-Tool"
-            className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer min-h-[36px] min-w-[36px] flex items-center justify-center touch-manipulation"
           >
-            <Info className="w-4 h-4" />
+            <Info className="w-4 h-4 shrink-0" />
           </button>
         </div>
 
         {activeTab !== 'edit' && (
-          <label className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer">
-            <Upload className="w-3.5 h-3.5" />
+          <label className="inline-flex items-center gap-1.5 px-3.5 py-2 min-h-[38px] rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold cursor-pointer touch-manipulation">
+            <Upload className="w-4 h-4 shrink-0" />
             <span>{activeTab === 'merge' ? 'Add PDFs to Merge' : singlePdf ? 'Change PDF' : 'Upload PDF'}</span>
             <input
               type="file"
@@ -830,13 +830,13 @@ export const PdfMultiTool: React.FC = () => {
       </div>
 
       {showInfo && (
-        <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300">
+        <div className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 leading-relaxed">
           Edit any existing text in a PDF in-place with matched font and constant font size, merge multiple PDFs, split or extract specific pages, compress file size, convert between PDF and Word/Excel/PNG, or add e-signatures.
         </div>
       )}
 
-      {/* Clean 7-Tab Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-1.5">
+      {/* Clean 7-Tab Bar - Swipeable on Mobile, Grid on Tablet/Desktop */}
+      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:grid sm:grid-cols-4 lg:grid-cols-7">
         {[
           { id: 'edit', label: 'Edit PDF Text', icon: FileEdit },
           { id: 'merge', label: 'Merge', icon: Layers },
@@ -853,13 +853,13 @@ export const PdfMultiTool: React.FC = () => {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id as PdfTab)}
-              className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl text-xs font-semibold border transition cursor-pointer ${
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 min-h-[42px] rounded-xl text-xs font-semibold border transition cursor-pointer shrink-0 whitespace-nowrap touch-manipulation active:scale-95 ${
                 active
-                  ? 'bg-indigo-600 border-indigo-500 text-white'
+                  ? 'bg-indigo-600 border-indigo-500 text-white shadow-xs'
                   : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border-slate-800'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-4 h-4 shrink-0" />
               <span>{tab.label}</span>
             </button>
           );

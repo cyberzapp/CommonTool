@@ -302,26 +302,26 @@ export const InvoiceGenerator: React.FC = () => {
             <button
               onClick={() => setShowInfo((v) => !v)}
               aria-label="Toggle tool info"
-              className="p-1 rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
+              className="p-1.5 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-lg border border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer touch-manipulation"
               title="About this tool"
             >
-              <Info className="w-4 h-4" />
+              <Info className="w-4 h-4 shrink-0" />
             </button>
           </div>
           <div className="flex flex-wrap gap-2">
             <button
               onClick={saveInvoiceTemplate}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold cursor-pointer touch-manipulation"
             >
-              <Save className="w-3.5 h-3.5 text-indigo-400" />
-              Save Template
+              <Save className="w-4 h-4 shrink-0 text-indigo-400" />
+              <span>Save Template</span>
             </button>
             <button
               onClick={exportUnbrandedPdf}
-              className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 cursor-pointer"
+              className="inline-flex items-center gap-2 px-3.5 py-2 min-h-[38px] rounded-xl bg-gradient-to-r from-indigo-500 to-blue-500 hover:from-indigo-400 hover:to-blue-400 text-white font-semibold text-xs shadow-lg shadow-indigo-500/20 cursor-pointer touch-manipulation active:scale-95"
             >
-              <Download className="w-3.5 h-3.5" />
-              Export Unbranded PDF
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Export PDF</span>
             </button>
           </div>
         </div>
@@ -477,10 +477,10 @@ export const InvoiceGenerator: React.FC = () => {
                 />
                 <button
                   onClick={() => removeItem(item.id)}
-                  className="col-span-2 sm:col-span-1 flex justify-center py-2 text-slate-500 hover:text-rose-400 cursor-pointer"
+                  className="col-span-2 sm:col-span-1 flex items-center justify-center py-2 min-h-[36px] text-slate-500 hover:text-rose-400 cursor-pointer touch-manipulation"
                   aria-label="Remove line item"
                 >
-                  <Trash2 className="w-4 h-4" />
+                  <Trash2 className="w-4 h-4 shrink-0" />
                 </button>
               </div>
             ))}

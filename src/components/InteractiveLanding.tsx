@@ -86,13 +86,13 @@ export const InteractiveLanding: React.FC<InteractiveLandingProps> = ({
           <a
             href="/how-to-use"
             onClick={(e) => onNavigatePage('how-to-use', e)}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition self-start sm:self-auto ${
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] rounded-lg border text-xs font-medium transition self-start sm:self-auto touch-manipulation ${
               isDark
                 ? 'bg-zinc-900 border-zinc-800 text-zinc-300 hover:text-white'
                 : 'bg-white border-slate-200 text-slate-700 hover:text-slate-950'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5 text-indigo-500" />
+            <BookOpen className="w-4 h-4 shrink-0 text-indigo-500" />
             <span>How to Use Guides</span>
           </a>
         )}
@@ -108,7 +108,7 @@ export const InteractiveLanding: React.FC<InteractiveLandingProps> = ({
               key={cat.id}
               type="button"
               onClick={(e) => onSelectCategory(cat.id, e)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 ${
+              className={`inline-flex items-center gap-1.5 px-3 py-2 min-h-[38px] rounded-lg text-xs font-semibold whitespace-nowrap transition cursor-pointer shrink-0 touch-manipulation active:scale-95 ${
                 active
                   ? 'bg-indigo-600 text-white shadow-xs'
                   : isDark
@@ -116,7 +116,7 @@ export const InteractiveLanding: React.FC<InteractiveLandingProps> = ({
                   : 'bg-white text-slate-600 border border-slate-200 hover:text-slate-900'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-4 h-4 shrink-0" />
               <span>{cat.label}</span>
             </button>
           );
@@ -168,7 +168,7 @@ export const InteractiveLanding: React.FC<InteractiveLandingProps> = ({
                     }}
                     title="View tool details"
                     aria-label={`Details for ${tool.shortTitle}`}
-                    className={`p-1.5 rounded-lg transition cursor-pointer ${
+                    className={`p-2 min-h-[36px] min-w-[36px] rounded-lg transition cursor-pointer flex items-center justify-center touch-manipulation ${
                       isInfoOpen
                         ? 'bg-indigo-600 text-white'
                         : isDark
@@ -176,20 +176,20 @@ export const InteractiveLanding: React.FC<InteractiveLandingProps> = ({
                         : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
                     }`}
                   >
-                    <Info className="w-3.5 h-3.5" />
+                    <Info className="w-4 h-4 shrink-0" />
                   </button>
 
                   <a
                     href={tool.path}
                     onClick={(e) => onNavigateTool(tool.id, e)}
                     aria-label={`Open ${tool.shortTitle}`}
-                    className={`p-1.5 rounded-lg transition ${
+                    className={`p-2 min-h-[36px] min-w-[36px] rounded-lg transition flex items-center justify-center touch-manipulation ${
                       isDark
                         ? 'text-zinc-500 group-hover:text-white'
                         : 'text-slate-400 group-hover:text-indigo-600'
                     }`}
                   >
-                    <ArrowUpRight className="w-4 h-4" />
+                    <ArrowUpRight className="w-4 h-4 shrink-0" />
                   </a>
                 </div>
               </div>
