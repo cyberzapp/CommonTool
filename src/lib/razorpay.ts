@@ -44,6 +44,8 @@ interface RazorpayOptions {
   name: string;
   description: string;
   order_id?: string;
+  callback_url?: string;
+  redirect?: boolean;
   prefill?: {
     name?: string;
     email?: string;
@@ -372,6 +374,7 @@ export async function processRazorpayDonation(params: {
     name: 'CommonTool Foundation',
     description: `${params.tierLabel} — Supporting Free & Private Web Utilities`,
     ...(orderId ? { order_id: orderId } : {}),
+    ...(redirectCallbackUrl ? { callback_url: redirectCallbackUrl } : {}),
     prefill: {
       name: params.donorName || 'CommonTool Supporter',
       email: params.donorEmail || 'support@breathy.in',

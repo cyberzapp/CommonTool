@@ -304,6 +304,13 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
         setLatestDonation(record);
         setDonationHistory(getDonationsHistory());
         onNavigatePage('thank-you');
+        if (typeof window !== 'undefined' && window.location.pathname !== '/thank-you') {
+          setTimeout(() => {
+            if (window.location.pathname !== '/thank-you') {
+              window.location.assign('/thank-you');
+            }
+          }, 120);
+        }
       },
       onCancel: (reason) => {
         setIsPaying(false);
