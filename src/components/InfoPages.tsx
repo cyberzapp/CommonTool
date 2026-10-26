@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldCheck,
   Lock,
@@ -27,15 +27,20 @@ import {
   processRazorpayDonation,
   downloadDonationReceiptPdf,
   getDonationsHistory,
+  loadDonorDraft,
+  saveDonorDraft,
+  checkAndRecoverRedirectDonation,
   type DonationRecord,
 } from '../lib/razorpay';
 import { logSupportTicketToFirestore } from '../lib/firebase';
 import { TOOLS_CATALOG, type ToolId } from '../types/tools';
 import { DownloadSuccessPage } from './DownloadSuccessPage';
+import { ThankYouPage } from './ThankYouPage';
 
 export type StaticPageId =
   | 'how-to-use'
   | 'donate'
+  | 'thank-you'
   | 'about'
   | 'security'
   | 'privacy-policy'
@@ -61,6 +66,13 @@ export const STATIC_PAGES_META: Record<
     seoTitle: 'Support CommonTool — Keep Free, Private Web Utilities Alive | Donate via Razorpay',
     seoDescription:
       'Support CommonTool with a heartfelt contribution via Razorpay. Help us keep all 18+ client-side tools 100% free, ad-free, and build our upcoming iOS and Android apps.',
+  },
+  'thank-you': {
+    path: '/thank-you',
+    label: 'Thank You ❤️',
+    seoTitle: 'Thank You for Supporting CommonTool — 100% Free & Private Utilities',
+    seoDescription:
+      'Thank you for contributing to CommonTool. Your official donation receipt has been generated.',
   },
   'download-success': {
     path: '/download-success',
@@ -177,26 +189,70 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
   const [supportMessage, setSupportMessage] = useState('');
   const [supportSubmitted, setSupportSubmitted] = useState(false);
 
-  // Donate / Razorpay State
-  const [currency, setCurrency] = useState<'INR' | 'USD'>('INR');
-  const [selectedTierId, setSelectedTierId] = useState<string>('supporter');
-  const [customAmount, setCustomAmount] = useState<string>('');
-  const [donorName, setDonorName] = useState('');
-  const [donorEmail, setDonorEmail] = useState('');
-  const [donorPhone, setDonorPhone] = useState('');
-  const [billingStreet, setBillingStreet] = useState('');
-  const [billingCity, setBillingCity] = useState('');
-  const [billingState, setBillingState] = useState('');
-  const [billingPostal, setBillingPostal] = useState('');
-  const [billingCountry, setBillingCountry] = useState('India');
-  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
-  const [donorMessage, setDonorMessage] = useState('');
+  // Donate / Razorpay State with persistent draft recovery (survives UPI redirects)
+  const donorDraft = useMemo(() => loadDonorDraft(), []);
+  const [currency, setCurrency] = useState<'INR' | 'USD'>(donorDraft?.currency || 'INR');
+  const [selectedTierId, setSelectedTierId] = useState<string>(donorDraft?.selectedTierId || 'supporter');
+  const [customAmount, setCustomAmount] = useState<string>(donorDraft?.customAmount || '');
+  const [donorName, setDonorName] = useState(donorDraft?.donorName || '');
+  const [donorEmail, setDonorEmail] = useState(donorDraft?.donorEmail || '');
+  const [donorPhone, setDonorPhone] = useState(donorDraft?.donorPhone || '');
+  const [billingStreet, setBillingStreet] = useState(donorDraft?.billingStreet || '');
+  const [billingCity, setBillingCity] = useState(donorDraft?.billingCity || '');
+  const [billingState, setBillingState] = useState(donorDraft?.billingState || '');
+  const [billingPostal, setBillingPostal] = useState(donorDraft?.billingPostal || '');
+  const [billingCountry, setBillingCountry] = useState(donorDraft?.billingCountry || 'India');
+  const [newsletterOptIn, setNewsletterOptIn] = useState(donorDraft?.newsletterOptIn ?? true);
+  const [donorMessage, setDonorMessage] = useState(donorDraft?.donorMessage || '');
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [latestDonation, setLatestDonation] = useState<DonationRecord | null>(null);
   const [donationHistory, setDonationHistory] = useState<DonationRecord[]>(() =>
     getDonationsHistory()
   );
+
+  // Auto-save donor drafts across form inputs
+  useEffect(() => {
+    saveDonorDraft({
+      donorName,
+      donorEmail,
+      donorPhone,
+      billingStreet,
+      billingCity,
+      billingState,
+      billingPostal,
+      billingCountry,
+      newsletterOptIn,
+      donorMessage,
+      currency,
+      selectedTierId,
+      customAmount,
+    });
+  }, [
+    donorName,
+    donorEmail,
+    donorPhone,
+    billingStreet,
+    billingCity,
+    billingState,
+    billingPostal,
+    billingCountry,
+    newsletterOptIn,
+    donorMessage,
+    currency,
+    selectedTierId,
+    customAmount,
+  ]);
+
+  // Check and recover payments after mobile browser UPI app switching reload
+  useEffect(() => {
+    void checkAndRecoverRedirectDonation().then((rec) => {
+      if (rec) {
+        setLatestDonation(rec);
+        onNavigatePage('thank-you');
+      }
+    });
+  }, [onNavigatePage]);
 
   const cardClass = `rounded-2xl border p-6 sm:p-8 ${
     isDark
@@ -247,6 +303,7 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
         setIsPaying(false);
         setLatestDonation(record);
         setDonationHistory(getDonationsHistory());
+        onNavigatePage('thank-you');
       },
       onCancel: (reason) => {
         setIsPaying(false);
@@ -324,7 +381,7 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
       {/* Sub-navigation bar across all 7 informational pages */}
       <div className="flex flex-wrap gap-1.5 pb-2 border-b border-slate-200 dark:border-zinc-800">
         {(Object.keys(STATIC_PAGES_META) as StaticPageId[])
-          .filter((id) => id !== 'download-success')
+          .filter((id) => id !== 'download-success' && id !== 'thank-you')
           .map((id) => {
           const meta = STATIC_PAGES_META[id];
           const active = pageId === id;
@@ -1453,6 +1510,15 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
           isDark={isDark}
           onNavigateTool={onNavigateTool}
           onNavigatePage={(p) => onNavigatePage(p as StaticPageId)}
+        />
+      )}
+
+      {/* 8. DEDICATED THANK YOU & OFFICIAL RECEIPT PAGE */}
+      {pageId === 'thank-you' && (
+        <ThankYouPage
+          isDark={isDark}
+          onNavigatePage={(p) => onNavigatePage(p as StaticPageId)}
+          onNavigateTool={onNavigateTool}
         />
       )}
     </div>

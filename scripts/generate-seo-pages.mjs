@@ -131,6 +131,11 @@ const ROUTES = [
     description: 'Support CommonTool with a heartfelt contribution via Razorpay. Help us keep all 18+ client-side tools 100% free, ad-free, and build our upcoming iOS and Android apps.',
   },
   {
+    routePath: 'thank-you',
+    title: 'Thank You for Supporting CommonTool — 100% Free & Private Utilities',
+    description: 'Thank you for your generous contribution to CommonTool. Your verified official donation receipt has been generated.',
+  },
+  {
     routePath: 'download-success',
     title: 'Download Complete — 100% Private Client-Side Processing | CommonTool',
     description: 'Your file has been generated locally in your browser with zero cloud uploads. Download your processed file and share with your network.',

@@ -15,6 +15,7 @@ import {
   STATIC_PAGES_META,
   type StaticPageId,
 } from './components/InfoPages';
+import { checkAndRecoverRedirectDonation } from './lib/razorpay';
 
 // 18 Tool Modules
 import { PdfMultiTool } from './components/tools/PdfMultiTool';
@@ -150,6 +151,22 @@ export function App() {
       metaTheme.setAttribute('content', theme === 'dark' ? '#09090b' : '#f8fafc');
     }
   }, [theme]);
+
+  // Recover UPI / Payment app redirect state if browser reloaded
+  useEffect(() => {
+    void checkAndRecoverRedirectDonation().then((rec) => {
+      if (rec) {
+        setActiveStaticPage('thank-you');
+        setActiveToolId(null);
+        setCurrentPathname('/thank-you');
+        try {
+          window.history.pushState({}, '', '/thank-you');
+        } catch {
+          // ignore
+        }
+      }
+    });
+  }, []);
 
   // Persist wide workspace setting
   useEffect(() => {
@@ -896,7 +913,9 @@ export function App() {
                     Company, Legal & Support
                   </p>
                   <ul className="space-y-1.5">
-                    {(Object.keys(STATIC_PAGES_META) as StaticPageId[]).map((pid) => (
+                    {(Object.keys(STATIC_PAGES_META) as StaticPageId[])
+                      .filter((pid) => pid !== 'download-success' && pid !== 'thank-you')
+                      .map((pid) => (
                       <li key={pid}>
                         <a
                           href={STATIC_PAGES_META[pid].path}
@@ -1086,7 +1105,9 @@ export function App() {
 
             <div className="pt-3 border-t border-slate-200 dark:border-zinc-800 space-y-1">
               <p className="px-3 text-[10px] font-bold uppercase text-slate-500">Guides, Company & Legal</p>
-              {(Object.keys(STATIC_PAGES_META) as StaticPageId[]).map((pid) => (
+              {(Object.keys(STATIC_PAGES_META) as StaticPageId[])
+                .filter((pid) => pid !== 'download-success' && pid !== 'thank-you')
+                .map((pid) => (
                 <a
                   key={pid}
                   href={STATIC_PAGES_META[pid].path}
