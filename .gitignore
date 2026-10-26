@@ -6,6 +6,7 @@ node_modules/
 # Build output
 dist/
 dist-ssr/
+functions/lib/
 *.local
 
 # Firebase cache & logs
@@ -16,8 +17,8 @@ ui-debug.log
 
 # Environment variables & service account keys (NEVER commit secrets)
 .env
-.env.local
-.env.production.local
+.env.*
+functions/.env*
 firebase-adminsdk.json
 *adminsdk*.json
 *service-account*.json

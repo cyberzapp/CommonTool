@@ -1,7 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { logDonationToFirestore } from './firebase';
 
-export const RAZORPAY_KEY_ID = 'rzp_test_RukOz4cBQyvFQE';
+export const RAZORPAY_KEY_ID =
+  (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || 'rzp_test_RukOz4cBQyvFQE';
 
 export interface DonationRecord {
   id: string;
@@ -98,6 +99,7 @@ export async function processRazorpayDonation(params: {
 
   // Try creating an official Razorpay Order via our backend middleware first
   let orderId: string | undefined;
+  let activeKey = RAZORPAY_KEY_ID;
   try {
     const res = await fetch('/api/razorpay/create-order', {
       method: 'POST',
@@ -114,6 +116,9 @@ export async function processRazorpayDonation(params: {
       const data = await res.json();
       if (data?.ok && data?.order?.id) {
         orderId = data.order.id;
+        if (data.keyId) {
+          activeKey = data.keyId;
+        }
       }
     }
   } catch {
@@ -121,7 +126,7 @@ export async function processRazorpayDonation(params: {
   }
 
   const options: RazorpayOptions = {
-    key: RAZORPAY_KEY_ID,
+    key: activeKey,
     amount: amountInSubunits,
     currency: params.currency,
     name: 'CommonTool Foundation',
@@ -145,7 +150,7 @@ export async function processRazorpayDonation(params: {
       const returnedOrderId = response.razorpay_order_id || orderId || `direct_${Date.now()}`;
       const signature = response.razorpay_signature;
 
-      let verified = true;
+      let verified = false;
       if (response.razorpay_order_id && signature) {
         try {
           const verifyRes = await fetch('/api/razorpay/verify-payment', {
@@ -156,10 +161,15 @@ export async function processRazorpayDonation(params: {
           if (verifyRes.ok) {
             const verifyJson = await verifyRes.json();
             verified = Boolean(verifyJson.verified);
+          } else {
+            console.warn('Payment verification signature check failed on server.');
+            verified = false;
           }
         } catch {
-          verified = true;
+          verified = false;
         }
+      } else {
+        verified = true;
       }
 
       const record: DonationRecord = {
