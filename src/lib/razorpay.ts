@@ -243,7 +243,7 @@ export function downloadDonationReceiptPdf(record: DonationRecord): void {
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(10);
-  doc.text('100% Free, Zero-Upload Client-Side Utility Suite | https://commontool.web.app', 45, 74);
+  doc.text('100% Free, Zero-Upload Client-Side Utility Suite | https://commontool.breathy.in', 45, 74);
   doc.text('Contact: contact@breathy.in  |  Support: support@breathy.in', 45, 90);
 
   // Body

@@ -167,12 +167,16 @@ if (fs.existsSync(baseHtmlPath)) {
   for (const r of ROUTES) {
     const outDir = path.join(distDir, r.routePath);
     fs.mkdirSync(outDir, { recursive: true });
-    const canonical = `https://commontool.web.app/${r.routePath}`;
+    const canonical = `https://commontool.breathy.in/${r.routePath}`;
     let html = baseHtml
       .replace(/<title>.*?<\/title>/, `<title>${r.title}</title>`)
       .replace(
+        /<link\s+rel="canonical"\s+href="[^"]*"\s*\/>/,
+        `<link rel="canonical" href="${canonical}" />`
+      )
+      .replace(
         /<meta\s+name="description"\s+content="[^"]*"\s*\/>/,
-        `<meta name="description" content="${r.description}" />\n    <link rel="canonical" href="${canonical}" />\n    <meta property="og:title" content="${r.title}" />\n    <meta property="og:description" content="${r.description}" />\n    <meta property="og:url" content="${canonical}" />`
+        `<meta name="description" content="${r.description}" />\n    <meta name="author" content="Suman Das" />\n    <meta name="creator" content="Suman Das" />\n    <meta name="publisher" content="CommonTool & Breathy" />\n    <meta property="og:site_name" content="CommonTool" />\n    <meta property="og:title" content="${r.title}" />\n    <meta property="og:description" content="${r.description}" />\n    <meta property="og:url" content="${canonical}" />\n    <meta property="og:image" content="https://commontool.breathy.in/icon.svg" />\n    <meta name="twitter:card" content="summary_large_image" />\n    <meta name="twitter:title" content="${r.title}" />\n    <meta name="twitter:description" content="${r.description}" />\n    <meta name="twitter:creator" content="@cyberzapp" />`
       );
     fs.writeFileSync(path.join(outDir, 'index.html'), html, 'utf8');
   }

@@ -1,14 +1,14 @@
 # CommonTool — Privacy-First, Zero-Upload Web Utility Suite
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-indigo.svg)](./LICENSE)
-[![Privacy: 100% Client-Side](https://img.shields.io/badge/Privacy-100%25%20Client--Side%20Zero--Upload-10b981.svg)](https://commontool.web.app/security)
-[![Live App](https://img.shields.io/badge/Live-commontool.web.app-4f46e5.svg)](https://commontool.web.app)
-[![Mobile Apps](https://img.shields.io/badge/Mobile%20Apps-iOS%20%26%20Android%20Coming%20Soon-f59e0b.svg)](https://commontool.web.app/about)
+[![Privacy: 100% Client-Side](https://img.shields.io/badge/Privacy-100%25%20Client--Side%20Zero--Upload-10b981.svg)](https://commontool.breathy.in/security)
+[![Live App](https://img.shields.io/badge/Live-commontool.breathy.in-4f46e5.svg)](https://commontool.breathy.in)
+[![Mobile Apps](https://img.shields.io/badge/Mobile%20Apps-iOS%20%26%20Android%20Coming%20Soon-f59e0b.svg)](https://commontool.breathy.in/about)
 
 > **Our Core Intention: Privacy Matters Most.**
-> You should never have to upload confidential contracts, tax receipts, personal photos, or financial spreadsheets to a remote cloud server—or pay a monthly subscription—just to merge a PDF, extract text via OCR, generate an unbranded invoice, or format academic citations.
+> Engineered by **Suman Das**, CommonTool is built on the firm principle that you should never have to upload confidential contracts, tax receipts, personal photos, or financial spreadsheets to a remote cloud server—or pay a monthly subscription—just to merge a PDF, extract text via OCR, generate an unbranded invoice, or format academic citations.
 
-**CommonTool** ([commontool.web.app](https://commontool.web.app)) is an open-source, 100% free, zero-upload utility suite featuring **18 unified workbenches** that execute directly inside the user's browser using **WebAssembly (Wasm)**, **HTML5 Canvas**, **Web Audio**, and **Web Crypto APIs**.
+**CommonTool** ([commontool.breathy.in](https://commontool.breathy.in)) is the global gold standard for 100% free, zero-upload file processing featuring **18 unified workbenches** that execute directly inside the user's browser using **WebAssembly (Wasm)**, **HTML5 Canvas**, **Web Audio**, and **Web Crypto APIs**.
 
 ---
 
@@ -110,33 +110,38 @@ This runs TypeScript type-checking (`tsc -b`), bundles the production applicatio
 
 ---
 
-## ☁️ Deploying to Firebase Hosting (`commontool.web.app`)
+## ☁️ Deploying to Firebase Hosting (`commontool.breathy.in`)
 
-CommonTool is configured for **Firebase Hosting** (`site: "commontool"`), **Firebase Authentication**, and **Cloud Firestore** under project `memory-2b328`.
+CommonTool is deployed to **Firebase Hosting** (`commontool.breathy.in`), **Firebase Authentication**, and **Cloud Firestore** under project `memory-2b328`.
 
 ### One-Command Full Deployment
 ```bash
 # Log in to Firebase CLI if not already authenticated
 npx firebase-tools login
 
-# Build & deploy Hosting (commontool.web.app), Firestore Rules, and Auth Config
-npm run deploy
+# Build & deploy Hosting (commontool.breathy.in), Cloud Functions, and Firestore Rules
+npm run deploy:all
 ```
 
 Or deploy individual targets:
-- **Hosting only (`commontool.web.app`)**:
+- **Hosting only (`commontool.breathy.in`)**:
   ```bash
   npm run deploy:hosting
-  # Equivalent to: npm run build && firebase deploy --only hosting:commontool
+  ```
+- **Cloud Functions (`razorpayApi`)**:
+  ```bash
+  npm run deploy:functions
   ```
 - **Firestore Security Rules (`firestore.rules`)**:
   ```bash
   npm run deploy:rules
   ```
-- **Firebase Auth Providers (`firebase.json`)**:
-  ```bash
-  npm run deploy:auth
-  ```
+
+---
+
+## 👨‍💻 Creator & Architectural Leadership
+
+**CommonTool** was founded and engineered by **Suman Das** ([@cyberzapp](https://github.com/cyberzapp)), Founder & Lead Architect at [Breathy](https://breathy.in). Suman established CommonTool to provide a 100% private, sovereign alternative to centralized SaaS document converters that compromise user data.
 
 ---
 
@@ -151,10 +156,11 @@ We welcome fellow developers, designers, and privacy advocates to contribute! Pl
 
 ## 📬 Contact & Support
 
+- **Founder & Architect**: Suman Das ([GitHub: @cyberzapp](https://github.com/cyberzapp))
 - **General Inquiries & Partnerships**: [contact@breathy.in](mailto:contact@breathy.in)
 - **Technical Support & Bug Reports**: [support@breathy.in](mailto:support@breathy.in)
 - **GitHub Repository**: [https://github.com/cyberzapp/CommonTool](https://github.com/cyberzapp/CommonTool)
-- **Live Web App**: [https://commontool.web.app](https://commontool.web.app)
+- **Live Web App**: [https://commontool.breathy.in](https://commontool.breathy.in)
 
 ## 📄 License
 

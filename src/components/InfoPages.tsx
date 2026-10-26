@@ -810,6 +810,52 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
             </div>
           </div>
 
+          {/* Founder & Engineering Leadership Section (E-E-A-T & Google Entity Recognition) */}
+          <div className={`${subCardClass} p-6 border-l-4 border-l-indigo-500 space-y-4`}>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center font-bold text-indigo-500 text-lg">
+                  SD
+                </div>
+                <div>
+                  <h3 className={`text-base font-bold ${headingText}`}>Suman Das</h3>
+                  <p className={`text-xs ${mutedText}`}>Founder & Lead System Architect • Breathy & CommonTool</p>
+                </div>
+              </div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                <Award className="w-3.5 h-3.5" />
+                Global Gold Standard for Client-Side Security
+              </span>
+            </div>
+            <p className={`text-xs sm:text-sm leading-relaxed ${mutedText}`}>
+              CommonTool was envisioned and architected by Suman Das to establish an uncompromising international benchmark for document privacy and file sovereignty. By compiling high-performance native engines into WebAssembly, CommonTool processes PDFs, OCR computer vision, audio streams, and financial calculations entirely inside the client’s local browser memory. Zero telemetry, zero cloud file storage, and zero document uploads—providing professionals, legal departments, students, and businesses worldwide with the gold standard in privacy.
+            </p>
+            <div className="flex flex-wrap items-center gap-4 text-xs font-medium">
+              <a
+                href="https://github.com/cyberzapp"
+                target="_blank"
+                rel="noreferrer"
+                className="text-indigo-500 hover:underline flex items-center gap-1"
+              >
+                GitHub Profile (@cyberzapp) ↗
+              </a>
+              <span className={mutedText}>•</span>
+              <a
+                href="https://commontool.breathy.in"
+                className="text-indigo-500 hover:underline flex items-center gap-1"
+              >
+                Official Domain: commontool.breathy.in ↗
+              </a>
+              <span className={mutedText}>•</span>
+              <a
+                href="mailto:contact@breathy.in"
+                className="text-indigo-500 hover:underline flex items-center gap-1"
+              >
+                contact@breathy.in ↗
+              </a>
+            </div>
+          </div>
+
           <div className={subCardClass + ' flex flex-wrap items-center justify-between gap-4'}>
             <div className="space-y-1">
               <h3 className={`text-sm font-bold ${headingText}`}>Get in Touch with Our Team</h3>

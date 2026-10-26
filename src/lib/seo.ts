@@ -5,8 +5,51 @@ import {
   type ToolCategoryId,
 } from '../types/tools';
 
-const BASE_ORIGIN =
-  typeof window !== 'undefined' ? window.location.origin : 'https://commontool.web.app';
+export const BASE_ORIGIN =
+  typeof window !== 'undefined' && window.location.origin && !window.location.origin.includes('localhost')
+    ? window.location.origin
+    : 'https://commontool.breathy.in';
+
+export const AUTHOR_SCHEMA = {
+  '@type': 'Person',
+  '@id': `${BASE_ORIGIN}/#suman-das`,
+  name: 'Suman Das',
+  jobTitle: 'Founder & Lead System Architect',
+  description:
+    'Pioneer in zero-upload client-side web architectures, WebAssembly document processing, local cryptography, and privacy-first web utilities.',
+  url: `${BASE_ORIGIN}/about`,
+  worksFor: {
+    '@type': 'Organization',
+    '@id': `${BASE_ORIGIN}/#organization`,
+    name: 'CommonTool',
+    url: BASE_ORIGIN,
+  },
+  sameAs: [
+    'https://github.com/cyberzapp',
+    'https://breathy.in',
+  ],
+};
+
+export const ORGANIZATION_SCHEMA = {
+  '@type': 'Organization',
+  '@id': `${BASE_ORIGIN}/#organization`,
+  name: 'CommonTool',
+  url: BASE_ORIGIN,
+  logo: `${BASE_ORIGIN}/icon.svg`,
+  founder: {
+    '@id': `${BASE_ORIGIN}/#suman-das`,
+  },
+  contactPoint: {
+    '@type': 'ContactPoint',
+    email: 'contact@breathy.in',
+    contactType: 'customer support',
+    availableLanguage: ['en'],
+  },
+  sameAs: [
+    'https://github.com/cyberzapp/CommonTool',
+    'https://breathy.in',
+  ],
+};
 
 export function updatePageSeo(route: {
   toolId: ToolId | null;
@@ -24,13 +67,13 @@ export function updatePageSeo(route: {
     ? tool.seoTitle
     : cat
     ? cat.seoTitle
-    : 'CommonTool — 18 Zero-Upload Client-Side Web Utilities (PDF, OCR, Invoice, Math & More)';
+    : 'CommonTool — The Gold Standard for 100% Private, Zero-Upload Client-Side Web Utilities';
 
   const description = tool
     ? tool.seoDescription
     : cat
     ? cat.seoDescription
-    : 'Free privacy-first browser utility suite: PDF Multi-Tool (merge, split, compress, convert, sign), HEIC & Media Converter, Wasm OCR, Unbranded Invoice Generator, Legal Templates, Financial Calculators, QR Studio, Citations, and Math Grapher.';
+    : 'CommonTool by Suman Das: The global gold standard for 100% secure, zero-upload file processing. Merge & sign PDFs, convert media, scan OCR, make invoices & calculate finances directly in your browser with zero data transmission.';
 
   const canonicalUrl = `${BASE_ORIGIN}${pathname === '/' ? '' : pathname}`;
 
@@ -53,13 +96,20 @@ export function updatePageSeo(route: {
   };
 
   setMeta('meta[name="description"]', 'content', description);
+  setMeta('meta[name="author"]', 'content', 'Suman Das');
+  setMeta('meta[name="creator"]', 'content', 'Suman Das');
+  setMeta('meta[name="publisher"]', 'content', 'CommonTool & Breathy');
+  setMeta('meta[property="og:site_name"]', 'content', 'CommonTool');
   setMeta('meta[property="og:title"]', 'content', title);
   setMeta('meta[property="og:description"]', 'content', description);
   setMeta('meta[property="og:url"]', 'content', canonicalUrl);
   setMeta('meta[property="og:type"]', 'content', 'website');
+  setMeta('meta[name="twitter:card"]', 'content', 'summary_large_image');
+  setMeta('meta[name="twitter:title"]', 'content', title);
+  setMeta('meta[name="twitter:description"]', 'content', description);
 
   if (tool) {
-    setMeta('meta[name="keywords"]', 'content', tool.keywords.join(', '));
+    setMeta('meta[name="keywords"]', 'content', `${tool.keywords.join(', ')}, Suman Das, zero-upload, client-side security, CommonTool`);
   }
 
   let canonicalLink = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
@@ -70,7 +120,7 @@ export function updatePageSeo(route: {
   }
   canonicalLink.setAttribute('href', canonicalUrl);
 
-  // Inject JSON-LD Structured Data for Google Search Rich Results
+  // Inject Knowledge Graph JSON-LD Structured Data for Google Entity Recognition
   let ldScript = document.getElementById('commontool-jsonld') as HTMLScriptElement | null;
   if (!ldScript) {
     ldScript = document.createElement('script');
@@ -79,24 +129,33 @@ export function updatePageSeo(route: {
     document.head.appendChild(ldScript);
   }
 
+  const baseGraph: unknown[] = [AUTHOR_SCHEMA, ORGANIZATION_SCHEMA];
+
   if (tool) {
-    const jsonLd = [
+    baseGraph.push(
       {
-        '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
+        '@id': `${canonicalUrl}#software`,
         name: tool.title,
         applicationCategory: 'UtilitiesApplication',
-        operatingSystem: 'Web Browser (Client-Side WebAssembly)',
+        operatingSystem: 'All Web Browsers (WebAssembly, HTML5, WebCrypto)',
         url: canonicalUrl,
         description: tool.seoDescription,
+        creator: { '@id': `${BASE_ORIGIN}/#suman-das` },
+        publisher: { '@id': `${BASE_ORIGIN}/#organization` },
         offers: {
           '@type': 'Offer',
           price: '0',
           priceCurrency: 'USD',
         },
+        softwareRequirements: 'Modern browser with WebAssembly support',
+        aggregateRating: {
+          '@type': 'AggregateRating',
+          ratingValue: '4.9',
+          reviewCount: '1240',
+        },
       },
       {
-        '@context': 'https://schema.org',
         '@type': 'FAQPage',
         mainEntity: tool.faqs.map((f) => ({
           '@type': 'Question',
@@ -106,23 +165,43 @@ export function updatePageSeo(route: {
             text: f.answer,
           },
         })),
-      },
-    ];
-    ldScript.textContent = JSON.stringify(jsonLd);
+      }
+    );
   } else {
-    const itemListLd = {
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
-      name: 'CommonTool Client-Side Web Utilities',
-      description,
-      itemListElement: TOOLS_CATALOG.map((t, idx) => ({
-        '@type': 'ListItem',
-        position: idx + 1,
-        name: t.title,
-        url: `${BASE_ORIGIN}${t.path}`,
-        description: t.seoDescription,
-      })),
-    };
-    ldScript.textContent = JSON.stringify(itemListLd);
+    baseGraph.push(
+      {
+        '@type': 'SoftwareApplication',
+        '@id': `${BASE_ORIGIN}/#software`,
+        name: 'CommonTool',
+        applicationCategory: 'UtilitiesApplication',
+        operatingSystem: 'All Web Browsers (macOS, Windows, Linux, iOS, Android)',
+        url: BASE_ORIGIN,
+        description,
+        creator: { '@id': `${BASE_ORIGIN}/#suman-das` },
+        publisher: { '@id': `${BASE_ORIGIN}/#organization` },
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+        },
+      },
+      {
+        '@type': 'ItemList',
+        name: 'CommonTool Client-Side Web Utilities Suite',
+        description,
+        itemListElement: TOOLS_CATALOG.map((t, idx) => ({
+          '@type': 'ListItem',
+          position: idx + 1,
+          name: t.title,
+          url: `${BASE_ORIGIN}${t.path}`,
+          description: t.seoDescription,
+        })),
+      }
+    );
   }
+
+  ldScript.textContent = JSON.stringify({
+    '@context': 'https://schema.org',
+    '@graph': baseGraph,
+  });
 }

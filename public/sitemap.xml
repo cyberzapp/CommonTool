@@ -1,160 +1,165 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://commontool.web.app/</loc>
+    <loc>https://commontool.breathy.in/</loc>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
   </url>
   <!-- Category Hub Landing Pages -->
   <url>
-    <loc>https://commontool.web.app/category/documents</loc>
+    <loc>https://commontool.breathy.in/category/documents</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/category/business</loc>
+    <loc>https://commontool.breathy.in/category/business</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/category/academic</loc>
+    <loc>https://commontool.breathy.in/category/academic</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/category/productivity</loc>
+    <loc>https://commontool.breathy.in/category/productivity</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
-  <!-- 18 Dedicated Tool URLs -->
+  <!-- Flagship Tools -->
   <url>
-    <loc>https://commontool.web.app/tools/pdf-multitool</loc>
+    <loc>https://commontool.breathy.in/tools/pdf-multitool</loc>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/pdf-organizer</loc>
+    <loc>https://commontool.breathy.in/tools/pdf-organizer</loc>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/media-converter</loc>
+    <loc>https://commontool.breathy.in/tools/media-converter</loc>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/ocr-scanner</loc>
+    <loc>https://commontool.breathy.in/tools/ai-solutions</loc>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/invoice-generator</loc>
+    <loc>https://commontool.breathy.in/tools/ocr-scanner</loc>
     <changefreq>weekly</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/business-templates</loc>
+    <loc>https://commontool.breathy.in/tools/invoice-generator</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.95</priority>
+  </url>
+  <url>
+    <loc>https://commontool.breathy.in/tools/business-templates</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/financial-calculators</loc>
+    <loc>https://commontool.breathy.in/tools/financial-calculators</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/loan-emi-planner</loc>
+    <loc>https://commontool.breathy.in/tools/loan-emi-planner</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/branding-utilities</loc>
+    <loc>https://commontool.breathy.in/tools/branding-utilities</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/citation-formatter</loc>
+    <loc>https://commontool.breathy.in/tools/citation-formatter</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/math-solver</loc>
+    <loc>https://commontool.breathy.in/tools/math-solver</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/writing-aids</loc>
+    <loc>https://commontool.breathy.in/tools/writing-aids</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/markdown-studio</loc>
+    <loc>https://commontool.breathy.in/tools/markdown-studio</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/data-workbench</loc>
+    <loc>https://commontool.breathy.in/tools/data-workbench</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/pomodoro-timer</loc>
+    <loc>https://commontool.breathy.in/tools/pomodoro-timer</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/scratchpad-checklist</loc>
+    <loc>https://commontool.breathy.in/tools/scratchpad-checklist</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/privacy-security</loc>
+    <loc>https://commontool.breathy.in/tools/privacy-security</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/tools/dev-diagnostics</loc>
+    <loc>https://commontool.breathy.in/tools/dev-diagnostics</loc>
     <changefreq>weekly</changefreq>
     <priority>0.9</priority>
   </url>
-  <!-- Company, Trust & Support Pages -->
+  <!-- Company, Author, Trust & Support Pages -->
   <url>
-    <loc>https://commontool.web.app/how-to-use</loc>
+    <loc>https://commontool.breathy.in/how-to-use</loc>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/donate</loc>
+    <loc>https://commontool.breathy.in/donate</loc>
     <changefreq>monthly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/about</loc>
+    <loc>https://commontool.breathy.in/about</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://commontool.breathy.in/security</loc>
+    <changefreq>monthly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://commontool.breathy.in/faq</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/security</loc>
+    <loc>https://commontool.breathy.in/help-and-support</loc>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/faq</loc>
+    <loc>https://commontool.breathy.in/privacy-policy</loc>
     <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
+    <priority>0.75</priority>
   </url>
   <url>
-    <loc>https://commontool.web.app/help-and-support</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.8</priority>
-  </url>
-  <url>
-    <loc>https://commontool.web.app/privacy-policy</loc>
-    <changefreq>monthly</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
-    <loc>https://commontool.web.app/terms-and-conditions</loc>
+    <loc>https://commontool.breathy.in/terms-and-conditions</loc>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
