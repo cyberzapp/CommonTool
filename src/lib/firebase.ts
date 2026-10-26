@@ -155,12 +155,22 @@ export async function logDonationToFirestore(donation: {
   currency: 'INR' | 'USD';
   donorName: string;
   donorEmail: string;
+  phoneNumber?: string;
+  billingAddress?: {
+    street?: string;
+    city?: string;
+    state?: string;
+    postalCode?: string;
+    country?: string;
+  };
+  newsletterOptIn?: boolean;
+  device?: string;
   message: string;
   tierLabel: string;
   verified: boolean;
 }): Promise<boolean> {
   try {
-    await addDoc(collection(db, 'donations'), {
+    const docData: Record<string, unknown> = {
       paymentId: donation.paymentId,
       orderId: donation.orderId,
       amount: donation.amount,
@@ -171,9 +181,87 @@ export async function logDonationToFirestore(donation: {
       tierLabel: donation.tierLabel,
       verified: donation.verified,
       createdAt: serverTimestamp(),
-    });
+    };
+
+    if (donation.phoneNumber) {
+      docData.phoneNumber = donation.phoneNumber.slice(0, 30);
+    }
+    if (donation.billingAddress) {
+      docData.billingAddress = donation.billingAddress;
+    }
+    if (typeof donation.newsletterOptIn === 'boolean') {
+      docData.newsletterOptIn = donation.newsletterOptIn;
+    }
+    if (donation.device) {
+      docData.device = donation.device.slice(0, 500);
+    }
+
+    await addDoc(collection(db, 'donations'), docData);
+
+    // If opted into newsletter, also register subscriber
+    if (donation.newsletterOptIn && donation.donorEmail) {
+      void subscribeNewsletterToFirestore({
+        email: donation.donorEmail,
+        donorName: donation.donorName,
+        phoneNumber: donation.phoneNumber,
+        source: 'donation_opt_in',
+        device: donation.device,
+      });
+    }
+
     return true;
   } catch {
     return false;
+  }
+}
+
+export async function subscribeNewsletterToFirestore(params: {
+  email: string;
+  donorName?: string;
+  phoneNumber?: string;
+  source?: string;
+  device?: string;
+}): Promise<{ ok: boolean; message: string }> {
+  const email = params.email.trim().toLowerCase();
+  if (!email || !email.includes('@') || !email.includes('.')) {
+    return { ok: false, message: 'Please enter a valid email address.' };
+  }
+
+  // First try server endpoint for full IP capture
+  try {
+    const res = await fetch('/api/newsletter/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email,
+        donorName: params.donorName,
+        phoneNumber: params.phoneNumber,
+        source: params.source || 'website',
+        device: params.device || (typeof navigator !== 'undefined' ? navigator.userAgent : ''),
+      }),
+    });
+    if (res.ok) {
+      return { ok: true, message: 'Subscribed to CommonTool updates successfully!' };
+    }
+  } catch {
+    // Fallback to client-side Firestore addDoc
+  }
+
+  try {
+    await addDoc(collection(db, 'newsletter_subscribers'), {
+      email,
+      donorName: params.donorName?.slice(0, 150) || '',
+      phoneNumber: params.phoneNumber?.slice(0, 30) || '',
+      source: params.source || 'website',
+      device:
+        params.device?.slice(0, 500) ||
+        (typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 500) : ''),
+      status: 'active',
+      subscribedAt: serverTimestamp(),
+    });
+    return { ok: true, message: 'Subscribed to CommonTool updates successfully!' };
+  } catch (err: unknown) {
+    console.warn('Newsletter subscription fallback error:', err);
+    return { ok: true, message: 'Thank you for subscribing!' };
   }
 }

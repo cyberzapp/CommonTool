@@ -133,6 +133,25 @@ function razorpayApiPlugin(): Plugin {
       }
     }
 
+    if (req.url === '/api/newsletter/subscribe' && req.method === 'POST') {
+      try {
+        const body = await readJsonBody(req);
+        const email = String(body.email || '').trim().toLowerCase();
+        if (!email || !email.includes('@') || !email.includes('.')) {
+          return sendJson(res, 400, { ok: false, error: 'Valid email address required.' });
+        }
+        return sendJson(res, 200, {
+          ok: true,
+          message: 'Subscribed to CommonTool newsletter successfully!',
+        });
+      } catch (err: unknown) {
+        return sendJson(res, 500, {
+          ok: false,
+          error: err instanceof Error ? err.message : 'Newsletter subscription error',
+        });
+      }
+    }
+
     next();
   };
 

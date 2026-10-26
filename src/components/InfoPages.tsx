@@ -31,6 +31,7 @@ import {
 } from '../lib/razorpay';
 import { logSupportTicketToFirestore } from '../lib/firebase';
 import { TOOLS_CATALOG, type ToolId } from '../types/tools';
+import { DownloadSuccessPage } from './DownloadSuccessPage';
 
 export type StaticPageId =
   | 'how-to-use'
@@ -40,7 +41,8 @@ export type StaticPageId =
   | 'privacy-policy'
   | 'terms-and-conditions'
   | 'faq'
-  | 'help-and-support';
+  | 'help-and-support'
+  | 'download-success';
 
 export const STATIC_PAGES_META: Record<
   StaticPageId,
@@ -59,6 +61,13 @@ export const STATIC_PAGES_META: Record<
     seoTitle: 'Support CommonTool — Keep Free, Private Web Utilities Alive | Donate via Razorpay',
     seoDescription:
       'Support CommonTool with a heartfelt contribution via Razorpay. Help us keep all 18+ client-side tools 100% free, ad-free, and build our upcoming iOS and Android apps.',
+  },
+  'download-success': {
+    path: '/download-success',
+    label: 'Download Complete',
+    seoTitle: 'Download Ready — 100% Private Client-Side Processing | CommonTool',
+    seoDescription:
+      'Your file has been generated locally on your device with zero cloud uploads. Download your processed file and share with your network.',
   },
   about: {
     path: '/about',
@@ -174,6 +183,13 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
   const [customAmount, setCustomAmount] = useState<string>('');
   const [donorName, setDonorName] = useState('');
   const [donorEmail, setDonorEmail] = useState('');
+  const [donorPhone, setDonorPhone] = useState('');
+  const [billingStreet, setBillingStreet] = useState('');
+  const [billingCity, setBillingCity] = useState('');
+  const [billingState, setBillingState] = useState('');
+  const [billingPostal, setBillingPostal] = useState('');
+  const [billingCountry, setBillingCountry] = useState('India');
+  const [newsletterOptIn, setNewsletterOptIn] = useState(true);
   const [donorMessage, setDonorMessage] = useState('');
   const [isPaying, setIsPaying] = useState(false);
   const [paymentError, setPaymentError] = useState<string | null>(null);
@@ -216,6 +232,15 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
       currency,
       donorName,
       donorEmail,
+      phoneNumber: donorPhone.trim() || undefined,
+      billingAddress: {
+        street: billingStreet.trim() || undefined,
+        city: billingCity.trim() || undefined,
+        state: billingState.trim() || undefined,
+        postalCode: billingPostal.trim() || undefined,
+        country: billingCountry.trim() || undefined,
+      },
+      newsletterOptIn,
       message: donorMessage,
       tierLabel,
       onSuccess: (record) => {
@@ -298,7 +323,9 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
     <div className="space-y-6">
       {/* Sub-navigation bar across all 7 informational pages */}
       <div className="flex flex-wrap gap-1.5 pb-2 border-b border-slate-200 dark:border-zinc-800">
-        {(Object.keys(STATIC_PAGES_META) as StaticPageId[]).map((id) => {
+        {(Object.keys(STATIC_PAGES_META) as StaticPageId[])
+          .filter((id) => id !== 'download-success')
+          .map((id) => {
           const meta = STATIC_PAGES_META[id];
           const active = pageId === id;
           const isDonate = id === 'donate';
@@ -639,6 +666,110 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
                     />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${mutedText}`}>
+                      Mobile / WhatsApp (for receipt & SMS confirmation)
+                    </label>
+                    <input
+                      type="tel"
+                      value={donorPhone}
+                      onChange={(e) => setDonorPhone(e.target.value)}
+                      placeholder="+91 98765 43210"
+                      className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                        isDark
+                          ? 'bg-zinc-900 border-zinc-800 text-white'
+                          : 'bg-white border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className={`block text-xs font-medium mb-1 ${mutedText}`}>
+                      Country / Region
+                    </label>
+                    <input
+                      type="text"
+                      value={billingCountry}
+                      onChange={(e) => setBillingCountry(e.target.value)}
+                      placeholder="e.g. India, United States"
+                      className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                        isDark
+                          ? 'bg-zinc-900 border-zinc-800 text-white'
+                          : 'bg-white border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Billing Address for Record Keeping & Compliance */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className={`block text-xs font-medium ${mutedText}`}>
+                      Billing Address (for Receipt & Compliance Audit)
+                    </label>
+                    <span className="text-[10px] text-zinc-400">Encrypted in Firestore</span>
+                  </div>
+                  <input
+                    type="text"
+                    value={billingStreet}
+                    onChange={(e) => setBillingStreet(e.target.value)}
+                    placeholder="Street Address or Building / Flat No."
+                    className={`w-full px-3 py-2 rounded-xl border text-xs ${
+                      isDark
+                        ? 'bg-zinc-900 border-zinc-800 text-white'
+                        : 'bg-white border-slate-200 text-slate-900'
+                    }`}
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      value={billingCity}
+                      onChange={(e) => setBillingCity(e.target.value)}
+                      placeholder="City"
+                      className={`px-3 py-2 rounded-xl border text-xs ${
+                        isDark
+                          ? 'bg-zinc-900 border-zinc-800 text-white'
+                          : 'bg-white border-slate-200 text-slate-900'
+                      }`}
+                    />
+                    <input
+                      type="text"
+                      value={billingState}
+                      onChange={(e) => setBillingState(e.target.value)}
+                      placeholder="State / Province"
+                      className={`px-3 py-2 rounded-xl border text-xs ${
+                        isDark
+                          ? 'bg-zinc-900 border-zinc-800 text-white'
+                          : 'bg-white border-slate-200 text-slate-900'
+                      }`}
+                    />
+                    <input
+                      type="text"
+                      value={billingPostal}
+                      onChange={(e) => setBillingPostal(e.target.value)}
+                      placeholder="Postal / PIN Code"
+                      className={`px-3 py-2 rounded-xl border text-xs ${
+                        isDark
+                          ? 'bg-zinc-900 border-zinc-800 text-white'
+                          : 'bg-white border-slate-200 text-slate-900'
+                      }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Newsletter Opt-In Checkbox */}
+                <label className="flex items-start gap-2.5 pt-1 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={newsletterOptIn}
+                    onChange={(e) => setNewsletterOptIn(e.target.checked)}
+                    className="mt-0.5 rounded border-zinc-700 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className={`text-xs ${mutedText}`}>
+                    Send me product updates, event news, and early access notifications from CommonTool & Breathy (Zero spam, unsubscribe anytime).
+                  </span>
+                </label>
 
                 <div>
                   <label className={`block text-xs font-medium mb-1 ${mutedText}`}>
@@ -1314,6 +1445,15 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* 7. POST-DOWNLOAD COMPLETION & VIRAL SHARE PAGE */}
+      {pageId === 'download-success' && (
+        <DownloadSuccessPage
+          isDark={isDark}
+          onNavigateTool={onNavigateTool}
+          onNavigatePage={(p) => onNavigatePage(p as StaticPageId)}
+        />
       )}
     </div>
   );

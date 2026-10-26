@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Tesseract from 'tesseract.js';
+import { triggerDownloadWithSuccessPage } from '../../lib/downloadManager';
 import {
   ScanText,
   Upload,
@@ -114,11 +115,15 @@ export const OcrScanner: React.FC = () => {
   const downloadTxt = () => {
     const blob = new Blob([ocrText], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'CommonTool-OCR-Extracted.txt';
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownloadWithSuccessPage({
+      fileBlobUrl: url,
+      fileName: 'CommonTool-OCR-Extracted.txt',
+      fileSize: blob.size,
+      toolId: 'ocr-scanner',
+      toolTitle: 'OCR Image-to-Text Scanner',
+      customMetricLabel: 'Characters Extracted',
+      customMetricValue: `${ocrText.length} chars`,
+    });
   };
 
   return (

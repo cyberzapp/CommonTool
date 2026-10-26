@@ -67,6 +67,13 @@
         }
       },
       {
+        "source": "/api/newsletter/**",
+        "function": {
+          "functionId": "razorpayApi",
+          "region": "us-central1"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

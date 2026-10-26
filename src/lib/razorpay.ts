@@ -4,6 +4,14 @@ import { logDonationToFirestore } from './firebase';
 export const RAZORPAY_KEY_ID =
   (import.meta.env.VITE_RAZORPAY_KEY_ID as string) || 'rzp_test_RukOz4cBQyvFQE';
 
+export interface BillingAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
 export interface DonationRecord {
   id: string;
   paymentId: string;
@@ -14,6 +22,10 @@ export interface DonationRecord {
   currency: 'INR' | 'USD';
   donorName: string;
   donorEmail: string;
+  phoneNumber?: string;
+  billingAddress?: BillingAddress;
+  newsletterOptIn?: boolean;
+  device?: string;
   message: string;
   tierLabel: string;
   createdAt: string;
@@ -35,6 +47,7 @@ interface RazorpayOptions {
   prefill?: {
     name?: string;
     email?: string;
+    contact?: string;
   };
   notes?: Record<string, string>;
   theme?: {
@@ -53,6 +66,14 @@ declare global {
       on: (event: string, callback: (err: unknown) => void) => void;
     };
   }
+}
+
+export function getClientDeviceInfo(): string {
+  if (typeof window === 'undefined') return 'unknown';
+  const ua = navigator.userAgent;
+  const platform = navigator.platform || 'Browser';
+  const scr = `${window.screen?.width || 0}x${window.screen?.height || 0}`;
+  return `${platform} (${scr}) | ${ua.slice(0, 250)}`;
 }
 
 export function loadRazorpayScript(): Promise<boolean> {
@@ -82,6 +103,9 @@ export async function processRazorpayDonation(params: {
   currency: 'INR' | 'USD';
   donorName: string;
   donorEmail: string;
+  phoneNumber?: string;
+  billingAddress?: BillingAddress;
+  newsletterOptIn?: boolean;
   message: string;
   tierLabel: string;
   onSuccess: (record: DonationRecord) => void;
@@ -96,6 +120,7 @@ export async function processRazorpayDonation(params: {
   }
 
   const amountInSubunits = Math.max(100, Math.round(params.amount * 100));
+  const clientDevice = getClientDeviceInfo();
 
   // Try creating an official Razorpay Order via our backend middleware first
   let orderId: string | undefined;
@@ -109,6 +134,10 @@ export async function processRazorpayDonation(params: {
         currency: params.currency,
         donorName: params.donorName || 'CommonTool Supporter',
         donorEmail: params.donorEmail,
+        phoneNumber: params.phoneNumber,
+        billingAddress: params.billingAddress,
+        newsletterOptIn: Boolean(params.newsletterOptIn),
+        device: clientDevice,
         message: params.message,
       }),
     });
@@ -135,12 +164,17 @@ export async function processRazorpayDonation(params: {
     prefill: {
       name: params.donorName || 'CommonTool Supporter',
       email: params.donorEmail || 'support@breathy.in',
+      contact: params.phoneNumber || undefined,
     },
     notes: {
       platform: 'CommonTool',
       tier: params.tierLabel,
       message: params.message || 'Keep CommonTool free!',
       contactEmail: 'contact@breathy.in',
+      phoneNumber: params.phoneNumber || '',
+      newsletterOptIn: String(Boolean(params.newsletterOptIn)),
+      billingCity: params.billingAddress?.city || '',
+      billingCountry: params.billingAddress?.country || '',
     },
     theme: {
       color: '#4f46e5',
@@ -156,7 +190,19 @@ export async function processRazorpayDonation(params: {
           const verifyRes = await fetch('/api/razorpay/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(response),
+            body: JSON.stringify({
+              ...response,
+              donorName: params.donorName,
+              donorEmail: params.donorEmail,
+              phoneNumber: params.phoneNumber,
+              billingAddress: params.billingAddress,
+              newsletterOptIn: params.newsletterOptIn,
+              device: clientDevice,
+              amount: params.amount,
+              currency: params.currency,
+              tierLabel: params.tierLabel,
+              message: params.message,
+            }),
           });
           if (verifyRes.ok) {
             const verifyJson = await verifyRes.json();
@@ -182,6 +228,10 @@ export async function processRazorpayDonation(params: {
         currency: params.currency,
         donorName: params.donorName.trim() || 'Anonymous Supporter',
         donorEmail: params.donorEmail.trim() || 'Not provided',
+        phoneNumber: params.phoneNumber?.trim() || undefined,
+        billingAddress: params.billingAddress,
+        newsletterOptIn: params.newsletterOptIn,
+        device: clientDevice,
         message: params.message.trim(),
         tierLabel: params.tierLabel,
         createdAt: new Date().toISOString(),
@@ -211,32 +261,37 @@ const DONATION_STORAGE_KEY = 'commontool_donations_history';
 export function getDonationsHistory(): DonationRecord[] {
   try {
     const raw = localStorage.getItem(DONATION_STORAGE_KEY);
-    if (!raw) return [];
-    return JSON.parse(raw);
+    return raw ? (JSON.parse(raw) as DonationRecord[]) : [];
   } catch {
     return [];
   }
 }
 
-export function saveDonationToHistory(record: DonationRecord): void {
+export function saveDonationToHistory(record: DonationRecord) {
   try {
-    const existing = getDonationsHistory();
-    const updated = [record, ...existing].slice(0, 25);
+    const current = getDonationsHistory();
+    const updated = [record, ...current.filter((d) => d.paymentId !== record.paymentId)].slice(
+      0,
+      25
+    );
     localStorage.setItem(DONATION_STORAGE_KEY, JSON.stringify(updated));
   } catch {
-    // ignore storage errors
+    // Ignore storage quota errors
   }
 }
 
-export function downloadDonationReceiptPdf(record: DonationRecord): void {
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' });
-  const symbol = record.currency === 'INR' ? 'INR ' : 'USD $';
+export function downloadDonationReceiptPdf(record: DonationRecord) {
+  const doc = new jsPDF({
+    unit: 'pt',
+    format: 'a4',
+  });
+
+  const symbol = record.currency === 'INR' ? 'Rs ' : '$';
 
   // Header Banner
   doc.setFillColor(79, 70, 229);
-  doc.rect(0, 0, 595, 110, 'F');
+  doc.rect(0, 0, 595, 24, 'F');
 
-  doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(22);
   doc.text('CommonTool — Official Contribution Receipt', 45, 52);
@@ -269,13 +324,27 @@ export function downloadDonationReceiptPdf(record: DonationRecord): void {
   // Receipt Box
   doc.setDrawColor(226, 232, 240);
   doc.setFillColor(248, 250, 252);
-  doc.roundedRect(45, 215, 505, 210, 8, 8, 'FD');
+  doc.roundedRect(45, 215, 505, 230, 8, 8, 'FD');
+
+  const formattedAddress = record.billingAddress
+    ? [
+        record.billingAddress.street,
+        record.billingAddress.city,
+        record.billingAddress.state,
+        record.billingAddress.postalCode,
+        record.billingAddress.country,
+      ]
+        .filter(Boolean)
+        .join(', ')
+    : 'Not provided';
 
   const rows: Array<[string, string]> = [
     ['Receipt Number', record.id],
     ['Date & Time', new Date(record.createdAt).toLocaleString()],
     ['Supporter Name', record.donorName],
     ['Supporter Email', record.donorEmail],
+    ['Supporter Phone', record.phoneNumber || 'Not provided'],
+    ['Billing Address', formattedAddress.slice(0, 48)],
     ['Contribution Tier', record.tierLabel],
     ['Amount Paid', `${symbol}${record.amount.toLocaleString()}`],
     ['Razorpay Payment ID', record.paymentId],
@@ -283,28 +352,28 @@ export function downloadDonationReceiptPdf(record: DonationRecord): void {
     ['Verification Status', record.verified ? 'Verified via Razorpay HMAC-SHA256' : 'Processed via Razorpay'],
   ];
 
-  let y = 242;
+  let y = 238;
   for (const [label, value] of rows) {
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
+    doc.setFontSize(9.5);
     doc.setTextColor(71, 85, 105);
     doc.text(label, 65, y);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(15, 23, 42);
     doc.text(String(value), 240, y);
-    y += 20;
+    y += 18;
   }
 
   if (record.message) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(10);
     doc.setTextColor(79, 70, 229);
-    doc.text(`Supporter Note: "${record.message.slice(0, 95)}"`, 45, 455);
+    doc.text(`Supporter Note: "${record.message.slice(0, 95)}"`, 45, 465);
   }
 
   doc.setDrawColor(226, 232, 240);
-  doc.line(45, 480, 550, 480);
+  doc.line(45, 488, 550, 488);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(9.5);
@@ -312,7 +381,7 @@ export function downloadDonationReceiptPdf(record: DonationRecord): void {
   doc.text(
     'Questions regarding your contribution? Email us anytime at contact@breathy.in or support@breathy.in.',
     45,
-    502
+    508
   );
 
   doc.save(`CommonTool-Donation-Receipt-${record.id}.pdf`);

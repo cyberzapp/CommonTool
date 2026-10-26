@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { jsPDF } from 'jspdf';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { triggerDownloadWithSuccessPage } from '../../lib/downloadManager';
 import {
   FileText,
   Sparkles,
@@ -762,11 +763,15 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
 
     const blob = new Blob([srt], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${(audioFile?.name || 'Session').replace(/\.[^.]+$/, '')}.srt`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerDownloadWithSuccessPage({
+      fileBlobUrl: url,
+      fileName: `${(audioFile?.name || 'Session').replace(/\.[^.]+$/, '')}.srt`,
+      fileSize: blob.size,
+      toolId: 'ai-solutions',
+      toolTitle: 'AI Studio (Audio & Speech Transcriber)',
+      customMetricLabel: 'Audio Duration Transcribed',
+      customMetricValue: `${audioDuration.toFixed(1)}s`,
+    });
   };
 
   // =========================================================================
@@ -1121,10 +1126,14 @@ This Agreement may be terminated by either party upon thirty (30) days prior wri
   const handleDownloadEnhancedPhoto = (fmt: 'jpeg' | 'png' | 'webp') => {
     if (!enhancedCanvasRef.current) return;
     const url = enhancedCanvasRef.current.toDataURL(`image/${fmt}`, 0.95);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${photoName.replace(/\.[^.]+$/, '')}-enhanced.${fmt === 'jpeg' ? 'jpg' : fmt}`;
-    a.click();
+    triggerDownloadWithSuccessPage({
+      fileBlobUrl: url,
+      fileName: `${photoName.replace(/\.[^.]+$/, '')}-enhanced.${fmt === 'jpeg' ? 'jpg' : fmt}`,
+      toolId: 'ai-solutions',
+      toolTitle: 'AI Studio (Vision Photo Suite)',
+      customMetricLabel: 'GPU Processing',
+      customMetricValue: '100% Client-Side Canvas',
+    });
   };
 
   // =========================================================================

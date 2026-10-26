@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { jsPDF } from 'jspdf';
+import { triggerDownloadWithSuccessPage } from '../../lib/downloadManager';
 import {
   Receipt,
   Plus,
@@ -277,7 +278,17 @@ export const InvoiceGenerator: React.FC = () => {
       doc.text(doc.splitTextToSize(notes, pageW - 90), 45, y);
     }
 
-    doc.save(`${docType}-${docNumber}.pdf`);
+    const outBlob = doc.output('blob');
+    const url = URL.createObjectURL(outBlob);
+    triggerDownloadWithSuccessPage({
+      fileBlobUrl: url,
+      fileName: `${docType}-${docNumber}.pdf`,
+      fileSize: outBlob.size,
+      toolId: 'invoice-generator',
+      toolTitle: 'Unbranded Invoice & Receipt Generator',
+      customMetricLabel: 'Document Total',
+      customMetricValue: formatMoney(grandTotal),
+    });
     setBanner(`Exported clean, unbranded ${docType}-${docNumber}.pdf!`);
   };
 

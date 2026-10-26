@@ -3,6 +3,7 @@ import { PDFDocument, StandardFonts, rgb, degrees } from 'pdf-lib';
 import * as pdfjsLib from 'pdfjs-dist';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { triggerDownloadWithSuccessPage } from '../../lib/downloadManager';
 import {
   FileEdit,
   Upload,
@@ -2222,22 +2223,18 @@ export const PdfEditor: React.FC<PdfEditorProps> = ({
         }
       }
 
-      // Safe async download with 60-second retention
+      // Safe download with completion experience
       const blob = new Blob([outBytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `Edited-${fileName || 'Document.pdf'}`;
-      document.body.appendChild(a);
-      a.click();
-
-      setTimeout(() => {
-        if (document.body.contains(a)) {
-          document.body.removeChild(a);
-        }
-        URL.revokeObjectURL(url);
-      }, 60000);
+      triggerDownloadWithSuccessPage({
+        fileBlobUrl: url,
+        fileName: `Edited-${fileName || 'Document.pdf'}`,
+        fileSize: blob.size,
+        toolId: 'pdf-organizer',
+        toolTitle: 'PDF Editor & Organizer',
+        originalSize: pdfBytes?.byteLength || blob.size,
+        compressedSize: blob.size,
+      });
 
       if (onPdfSaved) {
         onPdfSaved(outBytes, fileName || 'Document.pdf');

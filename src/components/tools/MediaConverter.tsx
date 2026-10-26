@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import heic2any from 'heic2any';
 import JSZip from 'jszip';
+import { triggerDownloadWithSuccessPage } from '../../lib/downloadManager';
 import {
   Image as ImageIcon,
   Upload,
@@ -289,13 +290,17 @@ function encodeWav(buffer: AudioBuffer): Blob {
   return new Blob([ab], { type: 'audio/wav' });
 }
 
-function downloadBlob(blob: Blob, name: string) {
+function downloadBlob(blob: Blob, name: string, originalSize?: number) {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1500);
+  triggerDownloadWithSuccessPage({
+    fileBlobUrl: url,
+    fileName: name,
+    fileSize: blob.size,
+    toolId: 'media-converter',
+    toolTitle: 'Media & Image Converter Studio',
+    originalSize: originalSize && originalSize > blob.size ? originalSize : undefined,
+    compressedSize: blob.size,
+  });
 }
 
 // Crop aspect presets
@@ -497,14 +502,16 @@ export const MediaConverter: React.FC = () => {
     if (done.length === 0) return;
     if (done.length === 1) {
       const only = done[0];
-      downloadBlob(only.out!.blob, `${baseName(only.name)}.${only.out!.ext}`);
+      downloadBlob(only.out!.blob, `${baseName(only.name)}.${only.out!.ext}`, only.file.size);
       return;
     }
     setIsZipping(true);
     try {
       const zip = new JSZip();
       const used = new Set<string>();
+      let totalOriginalSize = 0;
       for (const it of done) {
+        totalOriginalSize += it.file.size;
         let name = `${baseName(it.name)}.${it.out!.ext}`;
         let n = 2;
         while (used.has(name)) name = `${baseName(it.name)}-${n++}.${it.out!.ext}`;
@@ -512,7 +519,7 @@ export const MediaConverter: React.FC = () => {
         zip.file(name, it.out!.blob);
       }
       const zipBlob = await zip.generateAsync({ type: 'blob' });
-      downloadBlob(zipBlob, `CommonTool-converted-${done.length}-images.zip`);
+      downloadBlob(zipBlob, `CommonTool-converted-${done.length}-images.zip`, totalOriginalSize);
     } finally {
       setIsZipping(false);
     }

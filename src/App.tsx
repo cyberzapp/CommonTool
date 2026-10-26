@@ -168,6 +168,20 @@ export function App() {
     return () => window.removeEventListener('keydown', handleGlobalKey);
   }, []);
 
+  // Listen for Post-Download Completion events across all utilities
+  useEffect(() => {
+    const handleDownloadComplete = () => {
+      setActiveToolId(null);
+      setActiveStaticPage('download-success');
+      setCurrentPathname('/download-success');
+      window.history.pushState({}, '', '/download-success');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.addEventListener('commontool-download-complete', handleDownloadComplete);
+    return () => window.removeEventListener('commontool-download-complete', handleDownloadComplete);
+  }, []);
+
   useEffect(() => {
     if (activeStaticPage) {
       const meta = STATIC_PAGES_META[activeStaticPage];

@@ -11,12 +11,35 @@ if (!admin.apps.length) {
 }
 const db = admin.firestore();
 
-// Define Razorpay Key Secret from Google Cloud Secret Manager
+// Define Razorpay Secrets from Google Cloud Secret Manager
 const razorpayKeySecret = defineSecret('RAZORPAY_KEY_SECRET');
+const razorpayWebhookSecret = defineSecret('RAZORPAY_WEBHOOK_SECRET');
+
+interface RequestWithRawBody extends Request {
+  rawBody?: Buffer;
+}
 
 const app = express();
 app.use(cors({ origin: true }));
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req: RequestWithRawBody, _res: Response, buf: Buffer) => {
+      req.rawBody = buf;
+    },
+  })
+);
+
+// Helper to safely extract client IP
+function getClientIp(req: Request): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') {
+    return forwarded.split(',')[0].trim();
+  }
+  if (Array.isArray(forwarded) && forwarded.length > 0) {
+    return forwarded[0].trim();
+  }
+  return req.socket.remoteAddress || 'unknown';
+}
 
 // Helper to safely resolve keys
 function getRazorpayCredentials() {
@@ -32,7 +55,14 @@ function getRazorpayCredentials() {
     secret = process.env.RAZORPAY_KEY_SECRET || '';
   }
 
-  return { keyId, secret };
+  let webhookSecret = '';
+  try {
+    webhookSecret = razorpayWebhookSecret.value();
+  } catch {
+    webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || secret;
+  }
+
+  return { keyId, secret, webhookSecret };
 }
 
 // Timing-safe signature check
@@ -59,6 +89,30 @@ function verifySignature(orderId: string, paymentId: string, signature: string, 
   }
 }
 
+// Timing-safe webhook signature check
+function verifyWebhookSignature(rawBody: Buffer | string, signature: string, secret: string): boolean {
+  if (!rawBody || !signature || !secret) {
+    return false;
+  }
+  try {
+    const expected = crypto
+      .createHmac('sha256', secret)
+      .update(rawBody)
+      .digest('hex');
+
+    const expectedBuf = Buffer.from(expected, 'utf8');
+    const signatureBuf = Buffer.from(signature, 'utf8');
+
+    if (expectedBuf.length !== signatureBuf.length) {
+      return false;
+    }
+    return crypto.timingSafeEqual(expectedBuf, signatureBuf);
+  } catch (err) {
+    console.error('Webhook signature verification error:', err);
+    return false;
+  }
+}
+
 // Handlers for Order Creation
 async function handleCreateOrder(req: Request, res: Response) {
   try {
@@ -77,7 +131,12 @@ async function handleCreateOrder(req: Request, res: Response) {
     const currency = typeof body.currency === 'string' ? body.currency.toUpperCase() : 'INR';
     const donorName = typeof body.donorName === 'string' ? body.donorName.slice(0, 100) : 'Supporter';
     const donorEmail = typeof body.donorEmail === 'string' ? body.donorEmail.slice(0, 150) : '';
+    const phoneNumber = typeof body.phoneNumber === 'string' ? body.phoneNumber.slice(0, 30) : '';
+    const billingAddress = typeof body.billingAddress === 'object' && body.billingAddress ? body.billingAddress : {};
+    const newsletterOptIn = Boolean(body.newsletterOptIn);
+    const device = typeof body.device === 'string' ? body.device.slice(0, 500) : (req.headers['user-agent'] || '');
     const message = typeof body.message === 'string' ? body.message.slice(0, 500) : '';
+    const deviceIp = getClientIp(req);
 
     const receipt = `ct_don_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
     const authHeader = Buffer.from(`${keyId}:${secret}`).toString('base64');
@@ -96,6 +155,8 @@ async function handleCreateOrder(req: Request, res: Response) {
           platform: 'CommonTool',
           donorName,
           donorEmail,
+          phoneNumber,
+          newsletterOptIn: String(newsletterOptIn),
           message,
         },
       }),
@@ -115,7 +176,7 @@ async function handleCreateOrder(req: Request, res: Response) {
       });
     }
 
-    // Optionally record pending order in Firestore
+    // Record pending order with complete audit details in Firestore
     try {
       if (orderData.id) {
         await db.collection('orders').doc(orderData.id).set(
@@ -126,6 +187,11 @@ async function handleCreateOrder(req: Request, res: Response) {
             currency,
             donorName,
             donorEmail,
+            phoneNumber,
+            billingAddress,
+            newsletterOptIn,
+            device,
+            deviceIp,
             message,
             status: 'created',
             createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -170,6 +236,18 @@ async function handleVerifyPayment(req: Request, res: Response) {
     const paymentId = String(body.razorpay_payment_id || '');
     const signature = String(body.razorpay_signature || '');
 
+    const donorName = typeof body.donorName === 'string' ? body.donorName.slice(0, 100) : 'Supporter';
+    const donorEmail = typeof body.donorEmail === 'string' ? body.donorEmail.slice(0, 150) : '';
+    const phoneNumber = typeof body.phoneNumber === 'string' ? body.phoneNumber.slice(0, 30) : '';
+    const billingAddress = typeof body.billingAddress === 'object' && body.billingAddress ? body.billingAddress : {};
+    const newsletterOptIn = Boolean(body.newsletterOptIn);
+    const device = typeof body.device === 'string' ? body.device.slice(0, 500) : (req.headers['user-agent'] || '');
+    const amount = Number(body.amount) || 0;
+    const currency = typeof body.currency === 'string' ? body.currency : 'INR';
+    const tierLabel = typeof body.tierLabel === 'string' ? body.tierLabel : 'Donation';
+    const message = typeof body.message === 'string' ? body.message.slice(0, 500) : '';
+    const deviceIp = getClientIp(req);
+
     if (!paymentId) {
       return res.status(400).json({
         ok: false,
@@ -202,7 +280,7 @@ async function handleVerifyPayment(req: Request, res: Response) {
       });
     }
 
-    // Record verified transaction securely in Firestore
+    // Record verified transaction with complete donor audit metadata in Firestore
     try {
       await db.collection('donations').doc(paymentId).set(
         {
@@ -210,11 +288,24 @@ async function handleVerifyPayment(req: Request, res: Response) {
           orderId,
           signature,
           verified: true,
+          donorName,
+          donorEmail,
+          phoneNumber,
+          billingAddress,
+          newsletterOptIn,
+          device,
+          deviceIp,
+          amount,
+          currency,
+          tierLabel,
+          message,
+          paymentTime: admin.firestore.FieldValue.serverTimestamp(),
           verifiedAt: admin.firestore.FieldValue.serverTimestamp(),
           source: 'cloud_function_verification',
         },
         { merge: true }
       );
+
       if (orderId) {
         await db.collection('orders').doc(orderId).set(
           {
@@ -225,8 +316,26 @@ async function handleVerifyPayment(req: Request, res: Response) {
           { merge: true }
         );
       }
+
+      // Automatically subscribe donor to newsletter if opted-in
+      if (newsletterOptIn && donorEmail) {
+        const subscriberId = donorEmail.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+        await db.collection('newsletter_subscribers').doc(subscriberId).set(
+          {
+            email: donorEmail.toLowerCase().trim(),
+            donorName,
+            phoneNumber,
+            source: 'donation_opt_in',
+            status: 'active',
+            device,
+            deviceIp,
+            subscribedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
     } catch (dbErr) {
-      console.warn('Could not update Firestore verification state (non-blocking):', dbErr);
+      console.warn('Could not update Firestore donation audit records (non-blocking):', dbErr);
     }
 
     return res.status(200).json({
@@ -246,7 +355,122 @@ async function handleVerifyPayment(req: Request, res: Response) {
   }
 }
 
-// Mount routes on both root and /api/razorpay prefixes for 100% Hosting rewrite compatibility
+// Handlers for Razorpay Webhook
+async function handleWebhook(req: RequestWithRawBody, res: Response) {
+  try {
+    const { webhookSecret } = getRazorpayCredentials();
+    const signature = String(req.headers['x-razorpay-signature'] || '');
+    const rawBody = req.rawBody || Buffer.from(JSON.stringify(req.body || {}));
+
+    if (!webhookSecret) {
+      console.warn('RAZORPAY_WEBHOOK_SECRET not configured. Skipping webhook signature validation.');
+    } else {
+      const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
+      if (!isValid) {
+        console.warn('Razorpay webhook signature verification FAILED.');
+        return res.status(400).json({ ok: false, error: 'Invalid webhook signature' });
+      }
+    }
+
+    const event = req.body || {};
+    const eventType = event.event;
+    console.log(`Razorpay Webhook Event Received: ${eventType}`);
+
+    if (eventType === 'payment.captured' || eventType === 'order.paid') {
+      const payment = event.payload?.payment?.entity;
+      if (payment && payment.id) {
+        const paymentId = payment.id;
+        const notes = payment.notes || {};
+        const donorEmail = payment.email || notes.donorEmail || '';
+        const donorName = notes.donorName || 'Supporter';
+        const phoneNumber = payment.contact || notes.phoneNumber || '';
+        const newsletterOptIn = notes.newsletterOptIn === 'true' || notes.newsletterOptIn === true;
+
+        await db.collection('donations').doc(paymentId).set(
+          {
+            paymentId,
+            orderId: payment.order_id || '',
+            amount: (payment.amount || 0) / 100,
+            currency: payment.currency || 'INR',
+            donorName,
+            donorEmail,
+            phoneNumber,
+            status: payment.status || 'captured',
+            webhookVerified: true,
+            webhookEvent: eventType,
+            deviceIp: getClientIp(req),
+            updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+
+        if (newsletterOptIn && donorEmail) {
+          const subscriberId = donorEmail.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
+          await db.collection('newsletter_subscribers').doc(subscriberId).set(
+            {
+              email: donorEmail.toLowerCase().trim(),
+              donorName,
+              phoneNumber,
+              source: 'webhook_donation_opt_in',
+              status: 'active',
+              subscribedAt: admin.firestore.FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
+      }
+    }
+
+    return res.status(200).json({ ok: true, status: 'processed' });
+  } catch (err: unknown) {
+    console.error('Exception in handleWebhook:', err);
+    return res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : 'Internal Server Error handling webhook',
+    });
+  }
+}
+
+// Handlers for Newsletter Subscription
+async function handleSubscribeNewsletter(req: Request, res: Response) {
+  try {
+    const body = req.body || {};
+    const rawEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+    const source = typeof body.source === 'string' ? body.source.slice(0, 100) : 'website';
+    const device = typeof body.device === 'string' ? body.device.slice(0, 500) : (req.headers['user-agent'] || '');
+    const deviceIp = getClientIp(req);
+
+    if (!rawEmail || !rawEmail.includes('@') || !rawEmail.includes('.') || rawEmail.length > 180) {
+      return res.status(400).json({ ok: false, error: 'Please enter a valid email address.' });
+    }
+
+    const subscriberId = rawEmail.replace(/[^a-z0-9_.-]/g, '_');
+    await db.collection('newsletter_subscribers').doc(subscriberId).set(
+      {
+        email: rawEmail,
+        source,
+        device,
+        deviceIp,
+        status: 'active',
+        subscribedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return res.status(200).json({
+      ok: true,
+      message: 'Subscribed to CommonTool updates successfully!',
+    });
+  } catch (err: unknown) {
+    console.error('Exception in handleSubscribeNewsletter:', err);
+    return res.status(500).json({
+      ok: false,
+      error: err instanceof Error ? err.message : 'Subscription error',
+    });
+  }
+}
+
+// Mount routes on both root and /api/ prefixes for 100% Hosting rewrite compatibility
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'razorpayApi', time: new Date().toISOString() }));
 app.get('/api/razorpay/health', (_req, res) => res.json({ ok: true, service: 'razorpayApi', time: new Date().toISOString() }));
 
@@ -256,10 +480,16 @@ app.post('/api/razorpay/create-order', handleCreateOrder);
 app.post('/verify-payment', handleVerifyPayment);
 app.post('/api/razorpay/verify-payment', handleVerifyPayment);
 
+app.post('/webhook', handleWebhook);
+app.post('/api/razorpay/webhook', handleWebhook);
+
+app.post('/subscribe-newsletter', handleSubscribeNewsletter);
+app.post('/api/newsletter/subscribe', handleSubscribeNewsletter);
+
 // Cloud Function Export (Gen 2)
 export const razorpayApi = onRequest(
   {
-    secrets: [razorpayKeySecret],
+    secrets: [razorpayKeySecret, razorpayWebhookSecret],
     cors: true,
     region: 'us-central1',
     maxInstances: 10,

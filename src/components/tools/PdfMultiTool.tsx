@@ -4,6 +4,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 import * as XLSX from 'xlsx';
 import JSZip from 'jszip';
+import { triggerDownloadWithSuccessPage } from '../../lib/downloadManager';
 import {
   FileText,
   FileEdit,
@@ -168,20 +169,17 @@ export const PdfMultiTool: React.FC = () => {
     return `${(bytes / 1048576).toFixed(2)} MB`;
   };
 
-  const downloadBlob = (blob: Blob, filename: string) => {
+  const downloadBlob = (blob: Blob, filename: string, origSize?: number) => {
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      if (document.body.contains(a)) {
-        document.body.removeChild(a);
-      }
-      URL.revokeObjectURL(url);
-    }, 60000);
+    triggerDownloadWithSuccessPage({
+      fileBlobUrl: url,
+      fileName: filename,
+      fileSize: blob.size,
+      toolId: 'pdf-multitool',
+      toolTitle: 'PDF Multi-Tool Suite',
+      originalSize: origSize && origSize > blob.size ? origSize : singlePdf?.size,
+      compressedSize: blob.size,
+    });
   };
 
   const handleUploadPdfs = async (files: FileList | null, target: 'merge' | 'single') => {

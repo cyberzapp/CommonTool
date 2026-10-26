@@ -131,6 +131,11 @@ const ROUTES = [
     description: 'Support CommonTool with a heartfelt contribution via Razorpay. Help us keep all 18+ client-side tools 100% free, ad-free, and build our upcoming iOS and Android apps.',
   },
   {
+    routePath: 'download-success',
+    title: 'Download Complete — 100% Private Client-Side Processing | CommonTool',
+    description: 'Your file has been generated locally in your browser with zero cloud uploads. Download your processed file and share with your network.',
+  },
+  {
     routePath: 'about',
     title: 'About CommonTool — Privacy-First Online Workspace & Free Utility Suite',
     description: 'Learn how CommonTool empowers students, freelancers, and businesses with 18+ professional document, financial, academic, and developer utilities that run locally in your browser.',

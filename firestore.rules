@@ -61,14 +61,34 @@ rules_version = '2';
 //
 // Collection: donations
 // Document ID: {donationId}
-// Access: Create-only after Razorpay checkout; read/update/delete denied to clients (Admin SDK / Console only)
+// Access: Create-only after Razorpay checkout; read/update/delete denied to clients (Cloud Functions Admin SDK / Console only)
 // Fields:
 //   - paymentId: string (required, 4-120 chars)
-//   - amount: number (required, > 0)
+//   - amount: number (required, > 0, <= 100000000)
 //   - currency: string (required, in ['INR', 'USD'])
 //   - donorName: string (required, 1-150 chars)
 //   - createdAt: timestamp, string, or number (required)
-//   - id / orderId / signature / verified / donorEmail / message / tierLabel / uid: optional Razorpay receipt fields
+//   - phoneNumber: string (optional, 5-30 chars)
+//   - billingAddress: map or string (optional, street, city, state, postalCode, country)
+//   - newsletterOptIn: bool (optional)
+//   - device: string (optional, 0-500 chars)
+//   - deviceIp: string (optional, 0-100 chars)
+//   - id / orderId / signature / verified / donorEmail / message / tierLabel / uid / userId / status / source / paymentTime / verifiedAt: optional fields
+//
+// Collection: newsletter_subscribers
+// Document ID: {subscriberId} (e.g. sanitized email or auto-generated ID)
+// Access: Create-only for visitors/users; read, update, delete denied to all clients (protects subscriber email privacy)
+// Fields:
+//   - email: string (required, 3-180 chars, contains '@' and '.')
+//   - subscribedAt: timestamp, string, or number (required)
+//   - donorName: string (optional, 0-150 chars)
+//   - source: string (optional, 1-100 chars, e.g. 'download_page', 'donate_page', 'footer')
+//   - newsletterOptIn: bool (optional)
+//   - device: string (optional, 0-500 chars)
+//   - deviceIp: string (optional, 0-100 chars)
+//   - status: string (optional, 1-50 chars, e.g. 'active')
+//   - phoneNumber: string (optional, 0-30 chars)
+//   - uid / userId: string (optional, 0-128 chars)
 //
 // ===============================================================
 
@@ -187,6 +207,24 @@ service cloud.firestore {
         (data[field] is string && data[field].size() <= maxStrLen) ||
         (data[field] is list && data[field].size() <= maxEntries) ||
         (data[field] is map && data[field].keys().size() <= maxEntries);
+    }
+
+    // Validate optional billing address (string or map with street, city, state, postalCode, country)
+    function isValidBillingAddress(addr) {
+      return addr == null ||
+        (addr is string && addr.size() >= 0 && addr.size() <= 500) ||
+        (addr is map &&
+         addr.keys().size() <= 10 &&
+         addr.keys().hasOnly(['street', 'city', 'state', 'postalCode', 'country', 'postal_code', 'line1', 'line2', 'zip']) &&
+         (!('street' in addr) || addr.street == null || (addr.street is string && addr.street.size() <= 200)) &&
+         (!('city' in addr) || addr.city == null || (addr.city is string && addr.city.size() <= 100)) &&
+         (!('state' in addr) || addr.state == null || (addr.state is string && addr.state.size() <= 100)) &&
+         (!('postalCode' in addr) || addr.postalCode == null || (addr.postalCode is string && addr.postalCode.size() <= 30)) &&
+         (!('country' in addr) || addr.country == null || (addr.country is string && addr.country.size() <= 100)) &&
+         (!('postal_code' in addr) || addr.postal_code == null || (addr.postal_code is string && addr.postal_code.size() <= 30)) &&
+         (!('line1' in addr) || addr.line1 == null || (addr.line1 is string && addr.line1.size() <= 200)) &&
+         (!('line2' in addr) || addr.line2 == null || (addr.line2 is string && addr.line2.size() <= 200)) &&
+         (!('zip' in addr) || addr.zip == null || (addr.zip is string && addr.zip.size() <= 30)));
     }
 
     // ===============================================================
@@ -339,7 +377,7 @@ service cloud.firestore {
     // Validate donations/{donationId} document
     function isValidDonation(data) {
       return hasRequiredFields(data, ['paymentId', 'amount', 'currency', 'donorName', 'createdAt']) &&
-        data.keys().size() <= 20 &&
+        data.keys().size() <= 25 &&
         noPrivilegeEscalation(data) &&
         data.paymentId is string && data.paymentId.size() >= 4 && data.paymentId.size() <= 120 &&
         data.amount is number && data.amount > 0 && data.amount <= 100000000 &&
@@ -355,7 +393,38 @@ service cloud.firestore {
         isValidOptionalString(data, 'tierLabel', 0, 120) &&
         isValidOptionalString(data, 'uid', 0, 128) &&
         isValidOptionalString(data, 'userId', 0, 128) &&
-        isValidOptionalString(data, 'status', 1, 50);
+        isValidOptionalString(data, 'status', 1, 50) &&
+        isValidOptionalString(data, 'source', 1, 100) &&
+        isValidOptionalDateOrTime(data, 'paymentTime') &&
+        isValidOptionalDateOrTime(data, 'verifiedAt') &&
+        isValidOptionalString(data, 'phoneNumber', 5, 30) &&
+        (!('billingAddress' in data) || isValidBillingAddress(data.billingAddress)) &&
+        isValidOptionalBool(data, 'newsletterOptIn') &&
+        isValidOptionalString(data, 'device', 0, 500) &&
+        isValidOptionalString(data, 'deviceIp', 0, 100);
+    }
+
+    // Validate newsletter_subscribers/{subscriberId} document
+    function isValidNewsletterSubscriber(data) {
+      return hasRequiredFields(data, ['email', 'subscribedAt']) &&
+        data.keys().size() <= 15 &&
+        noPrivilegeEscalation(data) &&
+        data.email is string &&
+        data.email.size() >= 3 &&
+        data.email.size() <= 180 &&
+        data.email.matches(".*@.*") &&
+        data.email.matches(".*\\..*") &&
+        data.subscribedAt != null &&
+        isValidOptionalDateOrTime(data, 'subscribedAt') &&
+        isValidOptionalString(data, 'donorName', 0, 150) &&
+        isValidOptionalString(data, 'source', 1, 100) &&
+        isValidOptionalBool(data, 'newsletterOptIn') &&
+        isValidOptionalString(data, 'device', 0, 500) &&
+        isValidOptionalString(data, 'deviceIp', 0, 100) &&
+        isValidOptionalString(data, 'status', 1, 50) &&
+        isValidOptionalString(data, 'phoneNumber', 0, 30) &&
+        isValidOptionalString(data, 'uid', 0, 128) &&
+        isValidOptionalString(data, 'userId', 0, 128);
     }
 
     // ===============================================================
@@ -415,7 +484,14 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
-    // 6. Default Deny all other paths
+    // 6. Newsletter Subscribers: newsletter_subscribers/{subscriberId}
+    // Create-only for visitors/users with strict schema validation; read/update/delete denied to protect subscriber privacy
+    match /newsletter_subscribers/{subscriberId} {
+      allow create: if isValidNewsletterSubscriber(request.resource.data);
+      allow read, update, delete: if false;
+    }
+
+    // 7. Default Deny all other paths
     match /{document=**} {
       allow read, write: if false;
     }
