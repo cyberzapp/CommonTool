@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import {
   TOOLS_CATALOG,
   CATEGORIES_CATALOG,
@@ -16,27 +16,28 @@ import {
   type StaticPageId,
 } from './components/InfoPages';
 import { checkAndRecoverRedirectDonation } from './lib/razorpay';
+import { ToolLandingPage } from './components/ToolLandingPage';
 
-// 18 Tool Modules
-import { PdfMultiTool } from './components/tools/PdfMultiTool';
-import { PdfOrganizer } from './components/tools/PdfOrganizer';
-import { MediaConverter } from './components/tools/MediaConverter';
-import { OcrScanner } from './components/tools/OcrScanner';
-import { InvoiceGenerator } from './components/tools/InvoiceGenerator';
-import { BusinessTemplates } from './components/tools/BusinessTemplates';
-import { FinancialCalculators } from './components/tools/FinancialCalculators';
-import { LoanEmiPlanner } from './components/tools/LoanEmiPlanner';
-import { BrandingUtilities } from './components/tools/BrandingUtilities';
-import { CitationFormatter } from './components/tools/CitationFormatter';
-import { MathSolver } from './components/tools/MathSolver';
-import { DataWorkbench } from './components/tools/DataWorkbench';
-import { WritingAids } from './components/tools/WritingAids';
-import { MarkdownStudio } from './components/tools/MarkdownStudio';
-import { PomodoroTimer } from './components/tools/PomodoroTimer';
-import { ScratchpadChecklist } from './components/tools/ScratchpadChecklist';
-import { PrivacySecurity } from './components/tools/PrivacySecurity';
-import { DevDiagnostics } from './components/tools/DevDiagnostics';
-import { AiSolutions } from './components/tools/AiSolutions';
+// Dynamically Code-Split Tool Modules for Instant Lighthouse & Mobile Performance
+const PdfMultiTool = lazy(() => import('./components/tools/PdfMultiTool').then((m) => ({ default: m.PdfMultiTool })));
+const PdfOrganizer = lazy(() => import('./components/tools/PdfOrganizer').then((m) => ({ default: m.PdfOrganizer })));
+const MediaConverter = lazy(() => import('./components/tools/MediaConverter').then((m) => ({ default: m.MediaConverter })));
+const OcrScanner = lazy(() => import('./components/tools/OcrScanner').then((m) => ({ default: m.OcrScanner })));
+const InvoiceGenerator = lazy(() => import('./components/tools/InvoiceGenerator').then((m) => ({ default: m.InvoiceGenerator })));
+const BusinessTemplates = lazy(() => import('./components/tools/BusinessTemplates').then((m) => ({ default: m.BusinessTemplates })));
+const FinancialCalculators = lazy(() => import('./components/tools/FinancialCalculators').then((m) => ({ default: m.FinancialCalculators })));
+const LoanEmiPlanner = lazy(() => import('./components/tools/LoanEmiPlanner').then((m) => ({ default: m.LoanEmiPlanner })));
+const BrandingUtilities = lazy(() => import('./components/tools/BrandingUtilities').then((m) => ({ default: m.BrandingUtilities })));
+const CitationFormatter = lazy(() => import('./components/tools/CitationFormatter').then((m) => ({ default: m.CitationFormatter })));
+const MathSolver = lazy(() => import('./components/tools/MathSolver').then((m) => ({ default: m.MathSolver })));
+const DataWorkbench = lazy(() => import('./components/tools/DataWorkbench').then((m) => ({ default: m.DataWorkbench })));
+const WritingAids = lazy(() => import('./components/tools/WritingAids').then((m) => ({ default: m.WritingAids })));
+const MarkdownStudio = lazy(() => import('./components/tools/MarkdownStudio').then((m) => ({ default: m.MarkdownStudio })));
+const PomodoroTimer = lazy(() => import('./components/tools/PomodoroTimer').then((m) => ({ default: m.PomodoroTimer })));
+const ScratchpadChecklist = lazy(() => import('./components/tools/ScratchpadChecklist').then((m) => ({ default: m.ScratchpadChecklist })));
+const PrivacySecurity = lazy(() => import('./components/tools/PrivacySecurity').then((m) => ({ default: m.PrivacySecurity })));
+const DevDiagnostics = lazy(() => import('./components/tools/DevDiagnostics').then((m) => ({ default: m.DevDiagnostics })));
+const AiSolutions = lazy(() => import('./components/tools/AiSolutions').then((m) => ({ default: m.AiSolutions })));
 
 import {
   ShieldCheck,
@@ -125,6 +126,22 @@ export function App() {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [toolViewMode, setToolViewMode] = useState<'workspace' | 'landing'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    const v = params.get('view');
+    if (v === 'workspace') return 'workspace';
+    if (v === 'landing') return 'landing';
+    if (typeof window !== 'undefined' && sessionStorage.getItem('commontool_auth_redirect') === 'workspace') {
+      sessionStorage.removeItem('commontool_auth_redirect');
+      return 'workspace';
+    }
+    const rawPath = window.location.pathname.replace(/\/+$/, '') || '/';
+    // If user opens directly to a tool from browser address bar (direct/search visit), show the dedicated landing page
+    if (rawPath.startsWith('/tools/')) {
+      return 'landing';
+    }
+    return 'workspace';
+  });
   const [isWideWorkspace, setIsWideWorkspace] = useState<boolean>(() => {
     return localStorage.getItem('commontool_wide_workspace') === 'true';
   });
@@ -219,6 +236,12 @@ export function App() {
       setSelectedCategory(parsed.categoryId);
       setActiveStaticPage(parsed.staticPageId);
       setCurrentPathname(parsed.pathname);
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('view') === 'landing') {
+        setToolViewMode('landing');
+      } else {
+        setToolViewMode('workspace');
+      }
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
@@ -238,24 +261,28 @@ export function App() {
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const navigateToTool = useCallback((id: ToolId | null, e?: React.MouseEvent) => {
-    if (e) {
-      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
-      e.preventDefault();
-    }
-    const targetPath = id ? `/tools/${id}` : '/';
-    window.history.pushState({}, '', targetPath);
-    setActiveStaticPage(null);
-    setActiveToolId(id);
-    if (id) {
-      setGuideToolId(id);
-      const found = TOOLS_CATALOG.find((t) => t.id === id);
-      if (found) setSelectedCategory(found.category);
-    }
-    setCurrentPathname(targetPath);
-    setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, []);
+  const navigateToTool = useCallback(
+    (id: ToolId | null, e?: React.MouseEvent, viewMode: 'workspace' | 'landing' = 'workspace') => {
+      if (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+      }
+      const targetPath = id ? `/tools/${id}` : '/';
+      window.history.pushState({}, '', targetPath);
+      setActiveStaticPage(null);
+      setActiveToolId(id);
+      setToolViewMode(viewMode);
+      if (id) {
+        setGuideToolId(id);
+        const found = TOOLS_CATALOG.find((t) => t.id === id);
+        if (found) setSelectedCategory(found.category);
+      }
+      setCurrentPathname(targetPath);
+      setMobileMenuOpen(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    },
+    []
+  );
 
   const navigateToCategory = useCallback((cat: ToolCategoryId, e?: React.MouseEvent) => {
     if (e) {
@@ -371,7 +398,7 @@ export function App() {
   }> = [
     { id: 'all', path: '/', label: 'All Utilities', shortLabel: 'All', icon: LayoutGrid, count: TOOLS_CATALOG.length },
     { id: 'documents', path: '/category/documents', label: 'Documents & Files', shortLabel: 'Files', icon: FileText, count: 4 },
-    { id: 'business', path: '/category/business', label: 'Business & Finance', shortLabel: 'Business', icon: Briefcase, count: 5 },
+    { id: 'business', path: '/category/business', label: 'Business & Finance', shortLabel: 'Business', icon: Briefcase, count: 6 },
     { id: 'academic', path: '/category/academic', label: 'Student & Academic', shortLabel: 'Academic', icon: GraduationCap, count: 5 },
     { id: 'productivity', path: '/category/productivity', label: 'Daily Productivity', shortLabel: 'Daily', icon: Zap, count: 4 },
   ];
@@ -440,6 +467,46 @@ export function App() {
                   </select>
                   <ChevronDown className="w-3.5 h-3.5 shrink-0 absolute right-1.5 sm:right-2 text-zinc-400 pointer-events-none" />
                 </div>
+
+                {/* Workspace vs Overview Switcher Pill */}
+                <div
+                  className={`hidden sm:inline-flex items-center rounded-lg p-0.5 border text-xs font-semibold shrink-0 ${
+                    isDark ? 'bg-zinc-900 border-zinc-800' : 'bg-slate-100 border-slate-200'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setToolViewMode('workspace');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                      toolViewMode === 'workspace'
+                        ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                        : isDark
+                        ? 'text-zinc-400 hover:text-white'
+                        : 'text-slate-600 hover:text-slate-950'
+                    }`}
+                  >
+                    Workspace
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setToolViewMode('landing');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className={`px-2.5 py-1 rounded-md transition cursor-pointer ${
+                      toolViewMode === 'landing'
+                        ? 'bg-indigo-600 text-white shadow-xs font-bold'
+                        : isDark
+                        ? 'text-zinc-400 hover:text-white'
+                        : 'text-slate-600 hover:text-slate-950'
+                    }`}
+                  >
+                    Overview & Guide
+                  </button>
+                </div>
               </div>
             ) : (
               /* Catalog Mode: Brand Logo & Navigation Links */
@@ -506,7 +573,7 @@ export function App() {
               <div className="flex items-center gap-2 truncate">
                 <Search className="w-4 h-4 shrink-0" />
                 <span className="hidden sm:inline truncate">
-                  {activeToolId ? 'Jump to tool...' : 'Search 18 tools, guides...'}
+                  {activeToolId ? 'Jump to tool...' : `Search ${TOOLS_CATALOG.length} tools, guides...`}
                 </span>
               </div>
               <kbd
@@ -651,55 +718,136 @@ export function App() {
       {/* MAIN VIEWPORT ARCHITECTURE                                               */}
       {/* ========================================================================= */}
       {activeToolId && activeToolMeta ? (
-        /* ----------------------------------------------------------------------- */
-        /* 1. DEDICATED STUDIO WORKSPACE (100% Uncluttered, Full-Width Focus)       */
-        /* ----------------------------------------------------------------------- */
-        <main
-          className={`flex-1 w-full transition-all ${
-            isWideWorkspace ? 'px-2 sm:px-6 py-3' : 'max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6'
-          }`}
-        >
-          {/* Active Tool Canvas */}
-          <div className="w-full min-w-0">{renderActiveTool()}</div>
+        toolViewMode === 'landing' ? (
+          /* ----------------------------------------------------------------------- */
+          /* 1A. DEDICATED TOOL LANDING PAGE (SEO-Optimized Overview, FAQs & Guide)  */
+          /* ----------------------------------------------------------------------- */
+          <main className="max-w-5xl w-full mx-auto flex-1 px-3 sm:px-6 lg:px-8 py-6 space-y-6">
+            <div className="flex items-center justify-between gap-3">
+              <a
+                href="/"
+                onClick={(e) => navigateToCategory('all', e)}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer ${
+                  isDark
+                    ? 'bg-zinc-900 border-zinc-800 text-zinc-200 hover:bg-zinc-800'
+                    : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                All Tools
+              </a>
 
-          {/* Minimalist Studio Status Footer */}
-          <footer
-            className={`mt-10 pt-4 pb-4 border-t flex flex-wrap items-center justify-between gap-3 text-xs transition ${
-              isDark ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-500'
+              <button
+                type="button"
+                onClick={() => {
+                  setToolViewMode('workspace');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition shadow-xs cursor-pointer touch-manipulation"
+              >
+                <span>Launch Workspace</span>
+                <Zap className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            <ToolLandingPage
+              tool={activeToolMeta}
+              isDark={isDark}
+              onLaunchWorkspace={() => {
+                setToolViewMode('workspace');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateTool={(tid) => navigateToTool(tid, undefined, 'workspace')}
+            />
+          </main>
+        ) : (
+          /* ----------------------------------------------------------------------- */
+          /* 1B. DEDICATED STUDIO WORKSPACE (100% Uncluttered, Full-Width Focus)      */
+          /* ----------------------------------------------------------------------- */
+          <main
+            className={`flex-1 w-full transition-all ${
+              isWideWorkspace ? 'px-2 sm:px-6 py-3' : 'max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6'
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="font-medium text-slate-400 dark:text-zinc-400">
-                CommonTool Studio • 100% Client-Side In-Memory Processing (Zero Server Uploads)
+            {/* Mobile Mode Switcher Bar */}
+            <div className="flex sm:hidden items-center justify-between pb-2 mb-3 border-b border-slate-200 dark:border-zinc-800">
+              <span className="text-xs font-bold text-slate-700 dark:text-zinc-300">
+                {activeToolMeta.shortTitle} Workspace
               </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setToolViewMode('landing');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="text-xs font-semibold text-indigo-500 hover:underline cursor-pointer"
+              >
+                Overview & Guide →
+              </button>
             </div>
 
-            <div className="flex items-center gap-4 text-xs">
-              <a
-                href="/how-to-use"
-                onClick={(e) => navigateToStaticPage('how-to-use', e, activeToolMeta.id)}
-                className="hover:underline text-indigo-400 font-medium"
+            {/* Active Tool Canvas */}
+            <div className="w-full min-w-0">
+              <Suspense
+                fallback={
+                  <div
+                    className={`flex flex-col items-center justify-center min-h-[380px] rounded-2xl border p-8 space-y-3 animate-pulse ${
+                      isDark ? 'bg-zinc-900/50 border-zinc-800' : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="w-8 h-8 border-2 border-indigo-600 border-t-transparent rounded-full animate-spin" />
+                    <p className={`text-xs font-semibold ${isDark ? 'text-zinc-400' : 'text-slate-600'}`}>
+                      Initializing {activeToolMeta.shortTitle} sandbox on-device...
+                    </p>
+                  </div>
+                }
               >
-                How to Use {activeToolMeta.shortTitle}
-              </a>
-              <a
-                href="/security"
-                onClick={(e) => navigateToStaticPage('security', e)}
-                className="hover:underline"
-              >
-                Security & Privacy
-              </a>
-              <a
-                href="/donate"
-                onClick={(e) => navigateToStaticPage('donate', e)}
-                className="hover:underline text-rose-500 font-semibold"
-              >
-                Donate ❤️
-              </a>
+                {renderActiveTool()}
+              </Suspense>
             </div>
-          </footer>
-        </main>
+
+            {/* Minimalist Studio Status Footer */}
+            <footer
+              className={`mt-10 pt-4 pb-4 border-t flex flex-wrap items-center justify-between gap-3 text-xs transition ${
+                isDark ? 'border-zinc-800/80 text-zinc-400' : 'border-slate-200 text-slate-500'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="font-medium text-slate-400 dark:text-zinc-400">
+                  CommonTool Studio • 100% Client-Side In-Memory Processing (Zero Server Uploads)
+                </span>
+              </div>
+
+              <div className="flex items-center gap-4 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setToolViewMode('landing');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="hover:underline text-indigo-400 font-medium cursor-pointer"
+                >
+                  Overview & Guide
+                </button>
+                <a
+                  href="/security"
+                  onClick={(e) => navigateToStaticPage('security', e)}
+                  className="hover:underline"
+                >
+                  Security & Privacy
+                </a>
+                <a
+                  href="/donate"
+                  onClick={(e) => navigateToStaticPage('donate', e)}
+                  className="hover:underline text-rose-500 font-semibold"
+                >
+                  Donate ❤️
+                </a>
+              </div>
+            </footer>
+          </main>
+        )
       ) : activeStaticPage ? (
         /* ----------------------------------------------------------------------- */
         /* 2. STATIC READING / GUIDE PAGES                                         */
@@ -782,7 +930,7 @@ export function App() {
                   isDark ? 'text-zinc-500' : 'text-slate-500'
                 }`}
               >
-                All 18 Tools
+                All {TOOLS_CATALOG.length} Tools
               </p>
               <div className="space-y-0.5 max-h-[300px] overflow-y-auto pr-1">
                 {TOOLS_CATALOG.map((tool) => (
@@ -1049,7 +1197,7 @@ export function App() {
             }`}
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-zinc-800">
-              <span className="text-sm font-bold">All 18 Tools & Guides</span>
+              <span className="text-sm font-bold">All {TOOLS_CATALOG.length} Tools & Guides</span>
               <button
                 onClick={() => setMobileMenuOpen(false)}
                 className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-zinc-200 min-h-[36px] min-w-[36px] flex items-center justify-center"

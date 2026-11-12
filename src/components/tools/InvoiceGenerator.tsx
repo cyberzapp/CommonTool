@@ -203,8 +203,8 @@ export const InvoiceGenerator: React.FC = () => {
 
   // Payment Details & UPI QR
   const [bankDetails, setBankDetails] = useState<BankDetails>({
-    bankName: 'HDFC Bank Ltd',
-    accountHolder: 'Breathy Tech Studio',
+    bankName: 'Federal Bank / HDFC Bank Ltd',
+    accountHolder: 'Acme Studio Innovations',
     accountNumber: '50200012345678',
     ifscOrSwift: 'HDFC0001234',
     upiId: 'billing@upi',
@@ -1271,7 +1271,7 @@ export const InvoiceGenerator: React.FC = () => {
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-[10px] text-slate-500 mb-1">
-                  UPI VPA / ID (e.g. billing@upi, name@okaxis)
+                  UPI VPA / ID (e.g. billing@upi, company@okaxis)
                 </label>
                 <input
                   type="text"

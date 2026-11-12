@@ -45,6 +45,10 @@
           {
             "key": "Referrer-Policy",
             "value": "strict-origin-when-cross-origin"
+          },
+          {
+            "key": "Cross-Origin-Opener-Policy",
+            "value": "same-origin-allow-popups"
           }
         ]
       },
@@ -60,14 +64,7 @@
     ],
     "rewrites": [
       {
-        "source": "/api/razorpay/**",
-        "function": {
-          "functionId": "razorpayApi",
-          "region": "us-central1"
-        }
-      },
-      {
-        "source": "/api/newsletter/**",
+        "source": "/api/**",
         "function": {
           "functionId": "razorpayApi",
           "region": "us-central1"

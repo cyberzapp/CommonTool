@@ -541,15 +541,15 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left Column: Razorpay Checkout Card */}
+            {/* Left Column: Support Checkout Card */}
             <div className={'lg:col-span-7 ' + cardClass + ' space-y-5'}>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className={`text-lg font-bold ${headingText}`}>
-                    Make a Contribution via Razorpay
+                    Support CommonTool Development
                   </h2>
                   <p className={`text-xs ${mutedText}`}>
-                    Instant checkout supporting UPI, Google Pay, PhonePe, Cards & NetBanking
+                    Instant secure contribution supporting UPI, Cards, NetBanking & Wallets
                   </p>
                 </div>
 
@@ -588,7 +588,7 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
                           {latestDonation.currency === 'INR' ? '₹' : '$'}
                           {latestDonation.amount.toLocaleString()}
                         </strong>{' '}
-                        ({latestDonation.tierLabel}) has been verified via Razorpay.
+                        ({latestDonation.tierLabel}) has been verified.
                       </p>
                       <p className="text-[11px] font-mono-code text-emerald-500">
                         Payment ID: {latestDonation.paymentId} • Order: {latestDonation.orderId}
@@ -715,7 +715,7 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
                   </div>
                   <div>
                     <label className={`block text-xs font-medium mb-1 ${mutedText}`}>
-                      Email Address (for Razorpay Receipt)
+                      Email Address (for Official Tax Receipt)
                     </label>
                     <input
                       type="email"
@@ -855,19 +855,18 @@ export const InfoPages: React.FC<InfoPagesProps> = ({
                 <button
                   type="submit"
                   disabled={isPaying}
-                  className="w-full py-3 px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-sm transition flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full py-3.5 px-5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-sm shadow-md transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation active:scale-[0.99]"
                 >
-                  <CreditCard className="w-4 h-4" />
-                  {isPaying
-                    ? 'Opening Secure Razorpay Checkout...'
-                    : `Donate ${currency === 'INR' ? '₹' : '$'}${effectiveAmount.toLocaleString()} Securely via Razorpay`}
+                  <Heart className="w-4 h-4 fill-white shrink-0" />
+                  <span>
+                    {isPaying
+                      ? 'Opening Secure Checkout...'
+                      : `Donate ${currency === 'INR' ? '₹' : '$'}${effectiveAmount.toLocaleString()}`}
+                  </span>
                 </button>
 
                 <p className={`text-[11px] text-center ${mutedText}`}>
-                  100% Secure Payment Managed by <strong>Razorpay</strong> • Instant Official PDF Receipt • Questions?{' '}
-                  <a href="mailto:contact@breathy.in" className="text-indigo-500 hover:underline">
-                    contact@breathy.in
-                  </a>
+                  100% Encrypted & Secure Checkout • Instant Official PDF Receipt
                 </p>
               </form>
             </div>

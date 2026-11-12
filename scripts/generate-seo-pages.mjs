@@ -178,6 +178,52 @@ if (fs.existsSync(baseHtmlPath)) {
     const outDir = path.join(distDir, r.routePath);
     fs.mkdirSync(outDir, { recursive: true });
     const canonical = `https://commontool.breathy.in/${r.routePath}`;
+    const schemaData = {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "SoftwareApplication",
+          "name": r.title.split('—')[0].trim(),
+          "applicationCategory": "UtilitiesApplication",
+          "operatingSystem": "All",
+          "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD",
+          },
+          "author": {
+            "@type": "Person",
+            "name": "Suman Das",
+            "url": "https://commontool.breathy.in/about",
+          },
+        },
+        ...(r.faqs
+          ? [
+              {
+                "@type": "FAQPage",
+                "mainEntity": r.faqs.map((f) => ({
+                  "@type": "Question",
+                  "name": f.question,
+                  "acceptedAnswer": {
+                    "@type": "Answer",
+                    "text": f.answer,
+                  },
+                })),
+              },
+            ]
+          : []),
+      ],
+    };
+
+    const noscriptContent = `<div style="font-family:system-ui,-apple-system,sans-serif;max-width:900px;margin:40px auto;padding:24px;line-height:1.6;color:#1e293b;">
+      <h1 style="font-size:2.2rem;font-weight:900;color:#0f172a;letter-spacing:-0.02em;">${r.title}</h1>
+      <p style="font-size:1.15rem;color:#475569;margin-top:12px;line-height:1.6;">${r.description}</p>
+      <div style="margin:24px 0;padding:16px 20px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;color:#166534;font-size:0.95rem;">
+        <strong>100% Client-Side In-Memory Execution:</strong> Zero file uploads. All documents and data are processed locally on your device in your browser via WebAssembly and Web Crypto.
+      </div>
+      <p><a href="${canonical}" style="display:inline-block;padding:12px 28px;background:#4f46e5;color:#ffffff;border-radius:10px;text-decoration:none;font-weight:700;font-size:1rem;">Launch Free Tool Workspace &rarr;</a></p>
+    </div>`;
+
     let html = baseHtml
       .replace(/<title>.*?<\/title>/, `<title>${r.title}</title>`)
       .replace(
@@ -186,8 +232,9 @@ if (fs.existsSync(baseHtmlPath)) {
       )
       .replace(
         /<meta\s+name="description"\s+content="[^"]*"\s*\/>/,
-        `<meta name="description" content="${r.description}" />\n    <meta name="author" content="Suman Das" />\n    <meta name="creator" content="Suman Das" />\n    <meta name="publisher" content="CommonTool & Breathy" />\n    <meta property="og:site_name" content="CommonTool" />\n    <meta property="og:title" content="${r.title}" />\n    <meta property="og:description" content="${r.description}" />\n    <meta property="og:url" content="${canonical}" />\n    <meta property="og:image" content="https://commontool.breathy.in/icon.svg" />\n    <meta name="twitter:card" content="summary_large_image" />\n    <meta name="twitter:title" content="${r.title}" />\n    <meta name="twitter:description" content="${r.description}" />\n    <meta name="twitter:creator" content="@cyberzapp" />`
-      );
+        `<meta name="description" content="${r.description}" />\n    <meta name="author" content="Suman Das" />\n    <meta name="creator" content="Suman Das" />\n    <meta name="publisher" content="CommonTool & Breathy" />\n    <meta property="og:site_name" content="CommonTool" />\n    <meta property="og:title" content="${r.title}" />\n    <meta property="og:description" content="${r.description}" />\n    <meta property="og:url" content="${canonical}" />\n    <meta property="og:image" content="https://commontool.breathy.in/icon.svg" />\n    <meta name="twitter:card" content="summary_large_image" />\n    <meta name="twitter:title" content="${r.title}" />\n    <meta name="twitter:description" content="${r.description}" />\n    <meta name="twitter:creator" content="@cyberzapp" />\n    <script type="application/ld+json">${JSON.stringify(schemaData)}</script>`
+      )
+      .replace('<div id="root"></div>', `<div id="root">${noscriptContent}</div>`);
     fs.writeFileSync(path.join(outDir, 'index.html'), html, 'utf8');
   }
   console.log(`Pre-rendered ${ROUTES.length} static SEO route HTML files in dist/`);

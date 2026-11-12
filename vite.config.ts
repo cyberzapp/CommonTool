@@ -168,4 +168,44 @@ function razorpayApiPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), razorpayApiPlugin()],
+  build: {
+    chunkSizeWarningLimit: 1200,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom') || id.includes('scheduler')) {
+              return 'vendor-react';
+            }
+            if (id.includes('recharts') || id.includes('d3-')) {
+              return 'vendor-charts';
+            }
+            if (
+              id.includes('pdfjs-dist') ||
+              id.includes('pdf-lib') ||
+              id.includes('jspdf') ||
+              id.includes('@pdfsmaller')
+            ) {
+              return 'vendor-pdf';
+            }
+            if (id.includes('mathjs')) {
+              return 'vendor-math';
+            }
+            if (id.includes('xlsx') || id.includes('papaparse')) {
+              return 'vendor-sheets';
+            }
+            if (id.includes('tesseract.js')) {
+              return 'vendor-tesseract';
+            }
+            if (id.includes('firebase')) {
+              return 'vendor-firebase';
+            }
+            if (id.includes('lucide-react')) {
+              return 'vendor-icons';
+            }
+          }
+        },
+      },
+    },
+  },
 });

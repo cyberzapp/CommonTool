@@ -11,17 +11,29 @@ functions/lib/
 
 # Firebase cache & logs
 .firebase/
-firebase-debug.log
-firestore-debug.log
-ui-debug.log
+*.log
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
 
 # Environment variables & service account keys (NEVER commit secrets)
 .env
 .env.*
+.env.local
 functions/.env*
 firebase-adminsdk.json
 *adminsdk*.json
 *service-account*.json
+*.pem
+*.key
+
+# Archives, backups & external research projects
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+Data-visualizar/
+Data-visualizar-main/
 
 # Editor & OS files
 .DS_Store
